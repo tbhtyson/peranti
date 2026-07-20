@@ -19,4 +19,5 @@ Implement an item on the status list in a way that is good enough (or better tha
 | Frustum Culling | [] |
 | Greedy Meshing | [ ] |
 | Face Culling | [ ] |
+
 I just restarted this project, my code discipline wasn't enough, so nothing's here anymore
