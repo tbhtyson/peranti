@@ -1,5 +1,5 @@
 # peranti
-a luanti compatible (planned for next month) voxel game engine written using raylib in c that is highly performant (also malay word for device)
+a luanti compatible (planned for next month) voxel game engine written using vulkan in c that is highly performant (also malay word for device)
 ![my game be like](./ex.gif)
 ## Warning: no windows support yet! use at your own risk!
 ### build how? make say no raylib.h file!!1!
