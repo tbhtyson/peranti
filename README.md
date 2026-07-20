@@ -4,7 +4,6 @@ a luanti compatible (planned for next month) voxel game engine written using ray
 ## Warning: no windows support yet! use at your own risk!
 ### build how? make say no raylib.h file!!1!
 maybe run this: `git submodule update --init --recursive` then `make` and check build directory for new executables.
-Also dont forget to have x11 development packages, alsa, and mesa if on linux. For more info, see https://github.com/raysan5/raylib/wiki/Working-on-GNU-Linux
 ### how i contribute?
 Implement an item on the status list in a way that is good enough (or better than my current implementation)
 ### Status (features)
