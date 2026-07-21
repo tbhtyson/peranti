@@ -92,6 +92,10 @@ void createInstance(App *pApp) {
   createInfo.enabledExtensionCount = glfwExtensionCount;
   createInfo.ppEnabledExtensionNames = glfwExtensions;
   createInfo.enabledLayerCount = 0;
+  if (enableValidationLayers) {
+    createInfo.enabledLayerCount = validationLayerCount;
+    createInfo.ppEnabledLayerNames = validationLayers;
+  }
   if (vkCreateInstance(&createInfo, NULL, &pApp->instance) != VK_SUCCESS) {
     printf("createInstance failure!\n");
     exit(1);
