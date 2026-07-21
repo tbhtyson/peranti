@@ -1,3 +1,4 @@
+// #define NDEBUG
 #include <stdint.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -16,6 +17,40 @@ typedef struct App {
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
+const uint32_t validationLayerCount = 1;
+const char *validationLayers[] = {
+  "VK_LAYER_KHRONOS_validation"
+};
+#ifdef NDEBUG
+    const bool enableValidationLayers = false;
+#else
+    const bool enableValidationLayers = true;
+#endif
+
+bool checkValidationLayerSupport(void) {
+  uint32_t layerCount;
+  vkEnumerateInstanceLayerProperties(&layerCount, NULL);
+
+  VkLayerProperties *availableLayers = (VkLayerProperties*)malloc(sizeof(VkLayerProperties) * layerCount);
+  vkEnumerateInstanceLayerProperties(&layerCount, availableLayers);
+
+  for(int i = 0; i < validationLayerCount; i++) {
+    bool layerFound = false;
+    for(int j = 0; j < layerCount; j++) {
+      if(strcmp(availableLayers[j].layerName, validationLayers[i]) == 0) {
+        layerFound = true;
+        break;
+      }
+    }
+    if(!layerFound) {
+      free(availableLayers);
+      return false;
+    }
+  }
+  free(availableLayers);
+  return true;
+}
+
 bool verifyExtensionSupport(uint32_t extensionCount, VkExtensionProperties *extensions, uint32_t glfwExtensionCount, const char **glfwExtensions) {
   uint32_t found_extensions = 0;
   for(int i = 0; i < glfwExtensionCount; i++) {
@@ -23,6 +58,7 @@ bool verifyExtensionSupport(uint32_t extensionCount, VkExtensionProperties *exte
       if(strcmp(extensions[j].extensionName, glfwExtensions[i]) == 0) {
         printf("found support for:%s = %s\n", extensions[j].extensionName, glfwExtensions[i]);
         found_extensions++;
+        break;
       } else {
         printf("no support for:%s = %s\n", extensions[j].extensionName, glfwExtensions[i]);
       }
@@ -32,6 +68,10 @@ bool verifyExtensionSupport(uint32_t extensionCount, VkExtensionProperties *exte
 }
 
 void createInstance(App *pApp) {
+  if(enableValidationLayers && !checkValidationLayerSupport()) {
+    printf("validation layers requested but not available, please install vulkan validation layers or uncomment the #define NDEBUG at the top of main.c\n");
+    exit(1);
+  }
   VkApplicationInfo appInfo = {0};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
   appInfo.pApplicationName = "Peranti";
@@ -66,8 +106,10 @@ void createInstance(App *pApp) {
   bool extensionsSupported = verifyExtensionSupport(extensionCount, extensions, glfwExtensionCount, glfwExtensions);
   if(extensionsSupported) {
     printf("all required extensions supported! yippee!\n");
+    free(extensions);
   } else {
     printf("some required extensions not supported\n");
+    free(extensions);
     exit(1);
   }
 }
