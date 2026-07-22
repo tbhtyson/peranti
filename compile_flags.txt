@@ -1,5 +1,6 @@
 -Isrc
 -Ithird_party/glfw/include
+-Ithird_party/glad/include
 -std=c17
 -Wall
 -Wextra

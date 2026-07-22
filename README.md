@@ -3,6 +3,7 @@ a luanti compatible (planned for next month) voxel game engine written using ope
 ## Warning: no windows support yet! use at your own risk!
 ### build how? build.sh gives an error/running build/peranti gives me errors!
 maybe run this: `git submodule update --init --recursive` then `./build.sh` and check build directory for new executables.
+Also make sure you have opengl, x11, and wayland build utils if on linux.
 ### how i contribute?
 Implement an item on the status list in a way that is good enough (or better than my current implementation)
 ### Status (features)
@@ -14,7 +15,7 @@ Implement an item on the status list in a way that is good enough (or better tha
 | Chat | [ ] |
 | Textures | [ ] |
 | Rendering | [ ] |
-| Frustum Culling | [] |
+| Frustum Culling | [ ] |
 | Greedy Meshing | [ ] |
 | Face Culling | [ ] |
 
