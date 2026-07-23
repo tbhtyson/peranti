@@ -1,9 +1,9 @@
 # peranti
-a luanti compatible (planned for next month) voxel game engine written using opengl in c that is highly performant (also malay word for device)
+a luanti compatible (planned for next month) voxel game engine written using webgpu in c that is highly performant (also malay word for device)
 ## Warning: no windows support yet! use at your own risk!
 ### build how? build.sh gives an error/running build/peranti gives me errors!
 maybe run this: `git submodule update --init --recursive` then `./build.sh` and check build directory for new executables.
-Also make sure you have opengl, x11, and wayland build utils if on linux.
+Also make sure you have cargo, vulkan/opengl/metal build utils, and x11 and wayland build utils if on linux.
 ### how i contribute?
 Implement an item on the status list in a way that is good enough (or better than my current implementation)
 ### Status (features)

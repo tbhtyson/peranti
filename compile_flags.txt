@@ -1,6 +1,7 @@
 -Isrc
 -Ithird_party/glfw/include
--Ithird_party/glad/include
+-Ithird_party/wgpu-native/ffi
+-Ithird_party/wgpu-native/ffi/webgpu-headers
 -std=c17
 -Wall
 -Wextra
