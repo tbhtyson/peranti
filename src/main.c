@@ -1,8 +1,8 @@
+#include "mesh.h"
 #include "pipeline.h"
 #include "surface.h"
-#include "webgpu_context.h"
-
 #include "webgpu-headers/webgpu.h"
+#include "webgpu_context.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,6 +15,12 @@ int main(void) {
       webgpu_context_create(WINDOW_WIDTH, WINDOW_HEIGHT, "Peranti");
   WGPURenderPipeline pipeline =
       pipeline_create_triangle(ctx.device, ctx.surface_format);
+
+  static const Vertex triangle_vertices[] = {
+      {0.0f, 0.5f}, {-0.5f, -0.5f}, {0.5f, -0.5f}};
+  Mesh triangle_mesh =
+      mesh_create(ctx.device, ctx.queue, triangle_vertices,
+                  sizeof(triangle_vertices) / sizeof(triangle_vertices[0]));
 
   while (!glfwWindowShouldClose(ctx.window)) {
     glfwPollEvents();
@@ -53,7 +59,13 @@ int main(void) {
     WGPURenderPassEncoder pass =
         wgpuCommandEncoderBeginRenderPass(encoder, &pass_desc);
     wgpuRenderPassEncoderSetPipeline(pass, pipeline);
-    wgpuRenderPassEncoderDraw(pass, 3, 1, 0, 0);
+
+    wgpuRenderPassEncoderSetVertexBuffer(pass, 0, triangle_mesh.buffer, 0,
+                                         triangle_mesh.vertex_count *
+                                             sizeof(Vertex));
+    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
+    wgpuRenderPassEncoderDraw(pass, (uint32_t)triangle_mesh.vertex_count, 1, 0,
+                              0);
     wgpuRenderPassEncoderEnd(pass);
     wgpuRenderPassEncoderRelease(pass);
 
@@ -68,6 +80,7 @@ int main(void) {
     wgpuTextureViewRelease(view);
   }
 
+  mesh_destroy(&triangle_mesh);
   wgpuRenderPipelineRelease(pipeline);
   webgpu_context_destroy(&ctx);
   return 0;

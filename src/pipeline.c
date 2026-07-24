@@ -1,5 +1,7 @@
 #include "pipeline.h"
+#include "mesh.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -67,18 +69,29 @@ WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
   WGPUShaderModule shader_module = create_shader_module(device, wgsl_source);
   free(wgsl_source);
 
-  // --- Vertex state (no vertex buffers — positions are hardcoded in the
-  // shader) ---
+  // --- Vertex attribute + buffer layout (new) ---
+  WGPUVertexAttribute position_attr = {0};
+  position_attr.format = WGPUVertexFormat_Float32x2;
+  position_attr.offset = 0;
+  position_attr.shaderLocation = 0;
+
+  WGPUVertexBufferLayout vertex_layout = {0};
+  vertex_layout.arrayStride = sizeof(Vertex);
+  vertex_layout.stepMode = WGPUVertexStepMode_Vertex;
+  vertex_layout.attributeCount = 1;
+  vertex_layout.attributes = &position_attr;
+
+  // --- Vertex state ---
   WGPUVertexState vertex_state = {0};
   vertex_state.module = shader_module;
   vertex_state.entryPoint =
       (WGPUStringView){.data = "vs_main", .length = strlen("vs_main")};
   vertex_state.constantCount = 0;
   vertex_state.constants = NULL;
-  vertex_state.bufferCount = 0;
-  vertex_state.buffers = NULL;
+  vertex_state.bufferCount = 1;          // was 0
+  vertex_state.buffers = &vertex_layout; // was NULL
 
-  // --- Primitive state ---
+  // --- everything below this point is unchanged ---
   WGPUPrimitiveState primitive_state = {0};
   primitive_state.topology = WGPUPrimitiveTopology_TriangleList;
   primitive_state.stripIndexFormat = WGPUIndexFormat_Undefined;
