@@ -19,5 +19,8 @@ cmake -S third_party/glfw -B third_party/glfw/build -DBUILD_SHARED_LIBS=OFF -DGL
 cmake --build third_party/glfw/build
 cargo build --release --manifest-path third_party/wgpu-native/Cargo.toml
 
-gcc $CFLAGS -c src/main.c -o build/main.o
+for src_file in src/*.c; do
+    obj_file="build/$(basename "${src_file%.c}").o"
+    gcc $CFLAGS -c "$src_file" -o "$obj_file"
+done
 gcc build/*.o $LDFLAGS -o build/peranti
