@@ -2,6 +2,13 @@
 set -e
 rm -rf build/*
 mkdir -p build
+mkdir -p generated
+{
+    printf 'static const char *triangle_wgsl_source =\n'
+    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/    "/' -e 's/$/\\n"/' shaders/triangle.wgsl
+    printf ';\n'
+} > generated/triangle_wgsl.h
+
 
 GLFW_INC="third_party/glfw/include"
 GLFW_LIB="third_party/glfw/build/src"
@@ -12,7 +19,7 @@ GLFW_LIB="third_party/glfw/build/src"
 WGPU_INC="third_party/wgpu-native/ffi"
 WGPU_LIB="third_party/wgpu-native/target/release"
 
-CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Ithird_party/wgpu-native/ffi/webgpu-headers -I${GLFW_INC} -I${WGPU_INC}"
+CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Ithird_party/wgpu-native/ffi/webgpu-headers -I${GLFW_INC} -I${WGPU_INC} -Igenerated"
 LDFLAGS="-L${GLFW_LIB} -L${WGPU_LIB} -lglfw3 -l:libwgpu_native.a -lm -ldl -lpthread -lX11"
 
 cmake -S third_party/glfw -B third_party/glfw/build -DBUILD_SHARED_LIBS=OFF -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_BUILD_WAYLAND=OFF

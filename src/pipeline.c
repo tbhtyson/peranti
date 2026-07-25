@@ -1,5 +1,6 @@
 #include "pipeline.h"
 #include "mesh.h"
+#include "triangle_wgsl.h"
 
 #include <stddef.h>
 #include <stdio.h>
@@ -65,9 +66,7 @@ static WGPUShaderModule create_shader_module(WGPUDevice device,
 
 WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
                                             WGPUTextureFormat surface_format) {
-  char *wgsl_source = read_shader_file("shaders/triangle.wgsl");
-  WGPUShaderModule shader_module = create_shader_module(device, wgsl_source);
-  free(wgsl_source);
+  WGPUShaderModule shader_module = create_shader_module(device, triangle_wgsl_source);
 
   // --- Vertex attribute + buffer layout (new) ---
   WGPUVertexAttribute vertex_attrs[2] = {0};
