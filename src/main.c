@@ -4,20 +4,26 @@
 #include "webgpu-headers/webgpu.h"
 #include "webgpu_context.h"
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 const uint32_t WINDOW_WIDTH = 1600;
 const uint32_t WINDOW_HEIGHT = 900;
+uint32_t windowWidth = WINDOW_WIDTH;
+uint32_t windowHeight = WINDOW_HEIGHT;
 
 int main(void) {
+  float ratio = (float)windowWidth/windowHeight;
+  printf("Aspect Ratio: %f\n", ratio);
   WebGpuContext ctx =
       webgpu_context_create(WINDOW_WIDTH, WINDOW_HEIGHT, "Peranti");
   WGPURenderPipeline pipeline =
       pipeline_create_triangle(ctx.device, ctx.surface_format);
 
-  static const Vertex triangle_vertices[] = {
-      {0.0f, 0.5f}, {-0.5f, -0.5f}, {0.5f, -0.5f}};
+  const Vertex triangle_vertices[] = {
+      {-1.0f/ratio, 1.0f}, {-1.0f/ratio, -1.0f}, {1.0f/ratio, -1.0f},
+      {-1.0f/ratio, 1.0f}, {1.0f/ratio, 1.0f}, {1.0f/ratio, -1.0f}};
   Mesh triangle_mesh =
       mesh_create(ctx.device, ctx.queue, triangle_vertices,
                   sizeof(triangle_vertices) / sizeof(triangle_vertices[0]));
