@@ -14,7 +14,7 @@ uint32_t windowWidth = WINDOW_WIDTH;
 uint32_t windowHeight = WINDOW_HEIGHT;
 
 int main(void) {
-  float ratio = (float)windowWidth/windowHeight;
+  float ratio = (float)windowWidth / windowHeight;
   printf("Aspect Ratio: %f\n", ratio);
   WebGpuContext ctx =
       webgpu_context_create(WINDOW_WIDTH, WINDOW_HEIGHT, "Peranti");
@@ -22,11 +22,11 @@ int main(void) {
       pipeline_create_triangle(ctx.device, ctx.surface_format);
 
   const Vertex triangle_vertices[] = {
-    {0.0f/ratio, 0.5f,  1.0f, 0.0f, 0.0f},   // red
-    {-0.5f/ratio, -0.5f, 0.0f, 1.0f, 0.0f},  // green
-    {0.5f/ratio, -0.5f, 0.0f, 0.0f, 1.0f},    // blue
+      {0.0f / ratio, 0.5f, 1.0f, 0.0f, 0.0f},   // red
+      {-0.5f / ratio, -0.5f, 0.0f, 1.0f, 0.0f}, // green
+      {0.5f / ratio, -0.5f, 0.0f, 0.0f, 1.0f},  // blue
 
-};
+  };
   Mesh triangle_mesh =
       mesh_create(ctx.device, ctx.queue, triangle_vertices,
                   sizeof(triangle_vertices) / sizeof(triangle_vertices[0]));
@@ -72,7 +72,6 @@ int main(void) {
     wgpuRenderPassEncoderSetVertexBuffer(pass, 0, triangle_mesh.buffer, 0,
                                          triangle_mesh.vertex_count *
                                              sizeof(Vertex));
-    wgpuRenderPassEncoderSetPipeline(pass, pipeline);
     wgpuRenderPassEncoderDraw(pass, (uint32_t)triangle_mesh.vertex_count, 1, 0,
                               0);
     wgpuRenderPassEncoderEnd(pass);

@@ -2,6 +2,7 @@
 -Ithird_party/glfw/include
 -Ithird_party/wgpu-native/ffi
 -Ithird_party/wgpu-native/ffi/webgpu-headers
+-Igenerated
 -std=c17
 -Wall
 -Wextra

@@ -66,24 +66,25 @@ static WGPUShaderModule create_shader_module(WGPUDevice device,
 
 WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
                                             WGPUTextureFormat surface_format) {
-  WGPUShaderModule shader_module = create_shader_module(device, triangle_wgsl_source);
+  WGPUShaderModule shader_module =
+      create_shader_module(device, triangle_wgsl_source);
 
   // --- Vertex attribute + buffer layout (new) ---
   WGPUVertexAttribute vertex_attrs[2] = {0};
 
-vertex_attrs[0].format = WGPUVertexFormat_Float32x2;
-vertex_attrs[0].offset = offsetof(Vertex, x);
-vertex_attrs[0].shaderLocation = 0;
+  vertex_attrs[0].format = WGPUVertexFormat_Float32x2;
+  vertex_attrs[0].offset = offsetof(Vertex, x);
+  vertex_attrs[0].shaderLocation = 0;
 
-vertex_attrs[1].format = WGPUVertexFormat_Float32x3;
-vertex_attrs[1].offset = offsetof(Vertex, r);
-vertex_attrs[1].shaderLocation = 1;
+  vertex_attrs[1].format = WGPUVertexFormat_Float32x3;
+  vertex_attrs[1].offset = offsetof(Vertex, r);
+  vertex_attrs[1].shaderLocation = 1;
 
-WGPUVertexBufferLayout vertex_layout = {0};
-vertex_layout.arrayStride = sizeof(Vertex);
-vertex_layout.stepMode = WGPUVertexStepMode_Vertex;
-vertex_layout.attributeCount = 2;          // was 1
-vertex_layout.attributes = vertex_attrs;   // was &position_attr
+  WGPUVertexBufferLayout vertex_layout = {0};
+  vertex_layout.arrayStride = sizeof(Vertex);
+  vertex_layout.stepMode = WGPUVertexStepMode_Vertex;
+  vertex_layout.attributeCount = 2;
+  vertex_layout.attributes = vertex_attrs;
 
   // --- Vertex state ---
   WGPUVertexState vertex_state = {0};
@@ -92,8 +93,8 @@ vertex_layout.attributes = vertex_attrs;   // was &position_attr
       (WGPUStringView){.data = "vs_main", .length = strlen("vs_main")};
   vertex_state.constantCount = 0;
   vertex_state.constants = NULL;
-  vertex_state.bufferCount = 1;          // was 0
-  vertex_state.buffers = &vertex_layout; // was NULL
+  vertex_state.bufferCount = 1;
+  vertex_state.buffers = &vertex_layout;
 
   // --- everything below this point is unchanged ---
   WGPUPrimitiveState primitive_state = {0};
