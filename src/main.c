@@ -21,9 +21,12 @@ int main(void) {
   WGPURenderPipeline pipeline =
       pipeline_create_triangle(ctx.device, ctx.surface_format);
 
-  const Vertex triangle_vertices[] = {
-      {-1.0f/ratio, 1.0f}, {-1.0f/ratio, -1.0f}, {1.0f/ratio, -1.0f},
-      {-1.0f/ratio, 1.0f}, {1.0f/ratio, 1.0f}, {1.0f/ratio, -1.0f}};
+  static const Vertex triangle_vertices[] = {
+    {0.0f, 0.5f,  1.0f, 0.0f, 0.0f},   // red
+    {-0.5f, -0.5f, 0.0f, 1.0f, 0.0f},  // green
+    {0.5f, -0.5f, 0.0f, 0.0f, 1.0f},    // blue
+
+};
   Mesh triangle_mesh =
       mesh_create(ctx.device, ctx.queue, triangle_vertices,
                   sizeof(triangle_vertices) / sizeof(triangle_vertices[0]));

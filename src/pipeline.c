@@ -70,16 +70,21 @@ WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
   free(wgsl_source);
 
   // --- Vertex attribute + buffer layout (new) ---
-  WGPUVertexAttribute position_attr = {0};
-  position_attr.format = WGPUVertexFormat_Float32x2;
-  position_attr.offset = 0;
-  position_attr.shaderLocation = 0;
+  WGPUVertexAttribute vertex_attrs[2] = {0};
 
-  WGPUVertexBufferLayout vertex_layout = {0};
-  vertex_layout.arrayStride = sizeof(Vertex);
-  vertex_layout.stepMode = WGPUVertexStepMode_Vertex;
-  vertex_layout.attributeCount = 1;
-  vertex_layout.attributes = &position_attr;
+vertex_attrs[0].format = WGPUVertexFormat_Float32x2;
+vertex_attrs[0].offset = offsetof(Vertex, x);
+vertex_attrs[0].shaderLocation = 0;
+
+vertex_attrs[1].format = WGPUVertexFormat_Float32x3;
+vertex_attrs[1].offset = offsetof(Vertex, r);
+vertex_attrs[1].shaderLocation = 1;
+
+WGPUVertexBufferLayout vertex_layout = {0};
+vertex_layout.arrayStride = sizeof(Vertex);
+vertex_layout.stepMode = WGPUVertexStepMode_Vertex;
+vertex_layout.attributeCount = 2;          // was 1
+vertex_layout.attributes = vertex_attrs;   // was &position_attr
 
   // --- Vertex state ---
   WGPUVertexState vertex_state = {0};
