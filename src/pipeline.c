@@ -1,4 +1,5 @@
 #include "pipeline.h"
+#include "mat4.h"
 #include "mesh.h"
 #include "triangle_wgsl.h"
 
@@ -9,41 +10,6 @@
 
 // Reads shaders/triangle.wgsl into a heap-allocated, null-terminated buffer.
 // Caller owns the returned pointer and must free() it.
-static char *read_shader_file(const char *path) {
-  FILE *file = fopen(path, "rb");
-  if (!file) {
-    fprintf(stderr, "Failed to open shader file: %s\n", path);
-    exit(1);
-  }
-
-  if (fseek(file, 0, SEEK_END) != 0) {
-    fprintf(stderr, "Failed to seek shader file: %s\n", path);
-    exit(1);
-  }
-  long file_size = ftell(file);
-  if (file_size < 0) {
-    fprintf(stderr, "Failed to determine shader file size: %s\n", path);
-    exit(1);
-  }
-  rewind(file);
-
-  char *buffer = malloc((size_t)file_size + 1);
-  if (!buffer) {
-    fprintf(stderr, "Failed to allocate buffer for shader file: %s\n", path);
-    exit(1);
-  }
-
-  size_t bytes_read = fread(buffer, 1, (size_t)file_size, file);
-  fclose(file);
-
-  if (bytes_read != (size_t)file_size) {
-    fprintf(stderr, "Failed to read full shader file: %s\n", path);
-    exit(1);
-  }
-
-  buffer[file_size] = '\0';
-  return buffer;
-}
 
 static WGPUShaderModule create_shader_module(WGPUDevice device,
                                              const char *wgsl_source) {
@@ -64,15 +30,15 @@ static WGPUShaderModule create_shader_module(WGPUDevice device,
   return shader_module;
 }
 
-WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
+PipelineWithLayout pipeline_create_triangle(WGPUDevice device,
                                             WGPUTextureFormat surface_format) {
   WGPUShaderModule shader_module =
       create_shader_module(device, triangle_wgsl_source);
 
-  // --- Vertex attribute + buffer layout (new) ---
+  // --- Vertex attribute + buffer layout ---
   WGPUVertexAttribute vertex_attrs[2] = {0};
 
-  vertex_attrs[0].format = WGPUVertexFormat_Float32x2;
+  vertex_attrs[0].format = WGPUVertexFormat_Float32x3; // was Float32x2
   vertex_attrs[0].offset = offsetof(Vertex, x);
   vertex_attrs[0].shaderLocation = 0;
 
@@ -96,12 +62,42 @@ WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
   vertex_state.bufferCount = 1;
   vertex_state.buffers = &vertex_layout;
 
+  // --- Bind group layout: one uniform buffer, visible to the vertex stage ---
+  WGPUBindGroupLayoutEntry bind_layout_entry = {0};
+  bind_layout_entry.binding = 0;
+  bind_layout_entry.visibility = WGPUShaderStage_Vertex;
+  bind_layout_entry.buffer.type = WGPUBufferBindingType_Uniform;
+  bind_layout_entry.buffer.minBindingSize = sizeof(Mat4);
+
+  WGPUBindGroupLayoutDescriptor bind_layout_desc = {0};
+  bind_layout_desc.entryCount = 1;
+  bind_layout_desc.entries = &bind_layout_entry;
+
+  WGPUBindGroupLayout bind_group_layout =
+      wgpuDeviceCreateBindGroupLayout(device, &bind_layout_desc);
+  if (!bind_group_layout) {
+    fprintf(stderr, "Failed to create WGPUBindGroupLayout\n");
+    exit(1);
+  }
+
+  // --- Pipeline layout, built from the bind group layout above ---
+  WGPUPipelineLayoutDescriptor pipeline_layout_desc = {0};
+  pipeline_layout_desc.bindGroupLayoutCount = 1;
+  pipeline_layout_desc.bindGroupLayouts = &bind_group_layout;
+
+  WGPUPipelineLayout pipeline_layout =
+      wgpuDeviceCreatePipelineLayout(device, &pipeline_layout_desc);
+  if (!pipeline_layout) {
+    fprintf(stderr, "Failed to create WGPUPipelineLayout\n");
+    exit(1);
+  }
+
   // --- everything below this point is unchanged ---
   WGPUPrimitiveState primitive_state = {0};
   primitive_state.topology = WGPUPrimitiveTopology_TriangleList;
   primitive_state.stripIndexFormat = WGPUIndexFormat_Undefined;
   primitive_state.frontFace = WGPUFrontFace_CCW;
-  primitive_state.cullMode = WGPUCullMode_None;
+  primitive_state.cullMode = WGPUCullMode_Back;
 
   // --- Color target + fragment state ---
   WGPUColorTargetState color_target = {0};
@@ -120,8 +116,7 @@ WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
 
   // --- Pipeline ---
   WGPURenderPipelineDescriptor pipeline_desc = {0};
-  pipeline_desc.layout =
-      NULL; // NULL = let the implementation infer layout from the shader
+  pipeline_desc.layout = pipeline_layout; // was NULL
   pipeline_desc.vertex = vertex_state;
   pipeline_desc.primitive = primitive_state;
   pipeline_desc.depthStencil = NULL;
@@ -140,5 +135,9 @@ WGPURenderPipeline pipeline_create_triangle(WGPUDevice device,
   }
 
   wgpuShaderModuleRelease(shader_module);
-  return pipeline;
+  wgpuPipelineLayoutRelease(
+      pipeline_layout); // baked into `pipeline` already, safe to release now
+
+  return (PipelineWithLayout){.pipeline = pipeline,
+                              .bind_group_layout = bind_group_layout};
 }
