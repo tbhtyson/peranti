@@ -23,6 +23,11 @@ Mat4 mat4_rotate_y(float radians);
 // OpenGL-derived formula here without checking the z rows.
 Mat4 mat4_perspective(float fov_y_radians, float aspect, float z_near, float z_far);
 
+Vec3 vec3_cross(Vec3 a, Vec3 b);
+Vec3 vec3_normalize(Vec3 v);
+Vec3 vec3_subtract(Vec3 a, Vec3 b);
+float vec3_dot(Vec3 a, Vec3 b);
+
 Mat4 mat4_look_at(Vec3 eye, Vec3 target, Vec3 up);
 
 #endif // PERANTI_MAT4_H

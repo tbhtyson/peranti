@@ -1,5 +1,6 @@
 #include "webgpu_context.h"
 #include "surface.h"
+#include "webgpu.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -94,7 +95,6 @@ WebGpuContext webgpu_context_create(uint32_t width, uint32_t height,
   }
 
   WGPUTextureFormat surface_format = caps.formats[0];
-
   WGPUSurfaceConfiguration config = {0};
   config.device = device;
   config.format = surface_format;
@@ -104,7 +104,7 @@ WebGpuContext webgpu_context_create(uint32_t width, uint32_t height,
   config.viewFormatCount = 0;
   config.viewFormats = NULL;
   config.alphaMode = WGPUCompositeAlphaMode_Auto;
-  config.presentMode = WGPUPresentMode_Fifo;
+  config.presentMode = WGPUPresentMode_Immediate;
 
   wgpuSurfaceConfigure(surface, &config);
 

@@ -9,6 +9,12 @@ mkdir -p generated
     printf ';\n'
 } > generated/triangle_wgsl.h
 
+{
+    printf 'static const char *text_wgsl_source =\n'
+    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/    "/' -e 's/$/\\n"/' shaders/text.wgsl
+    printf ';\n'
+} > generated/text_wgsl.h
+
 
 GLFW_INC="third_party/glfw/include"
 GLFW_LIB="third_party/glfw/build/src"
