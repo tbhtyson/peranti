@@ -10,7 +10,8 @@
 
 static const GlyphEntry *find_glyph(char c) {
   for (size_t i = 0; i < glyph_table_count; i++) {
-    if (glyph_table[i].character == c) return &glyph_table[i];
+    if (glyph_table[i].character == c)
+      return &glyph_table[i];
   }
   return NULL; // unrecognized char (space, ':', etc.) -- rendered blank
 }
@@ -18,7 +19,8 @@ static const GlyphEntry *find_glyph(char c) {
 static void pixel_to_ndc(float px, float py, uint32_t window_width,
                          uint32_t window_height, float *ndc_x, float *ndc_y) {
   *ndc_x = (px / (float)window_width) * 2.0f - 1.0f;
-  *ndc_y = 1.0f - (py / (float)window_height) * 2.0f; // pixel y grows down, NDC y grows up
+  *ndc_y = 1.0f - (py / (float)window_height) *
+                      2.0f; // pixel y grows down, NDC y grows up
 }
 
 // Appends one stroke quad (two triangles, four verts) between two pixel
@@ -26,11 +28,14 @@ static void pixel_to_ndc(float px, float py, uint32_t window_width,
 static void append_segment_quad(Vertex2D *vertices, uint16_t *indices,
                                 size_t *vertex_cursor, size_t *index_cursor,
                                 float ax, float ay, float bx, float by,
-                                float stroke_width_px, float r, float g, float b,
-                                uint32_t window_width, uint32_t window_height) {
+                                float stroke_width_px, float r, float g,
+                                float b, uint32_t window_width,
+                                uint32_t window_height) {
   float dx = bx - ax;
   float dy = by - ay;
-  float len = sqrtf(dx * dx + dy * dy); // segment endpoints are always distinct -- no zero-length case
+  float len = sqrtf(
+      dx * dx +
+      dy * dy); // segment endpoints are always distinct -- no zero-length case
 
   float perp_x = -dy / len * (stroke_width_px * 0.5f);
   float perp_y = dx / len * (stroke_width_px * 0.5f);
@@ -45,8 +50,8 @@ static void append_segment_quad(Vertex2D *vertices, uint16_t *indices,
   uint16_t base_index = (uint16_t)*vertex_cursor;
   for (int i = 0; i < 4; i++) {
     float ndc_x, ndc_y;
-    pixel_to_ndc(corners_px[i][0], corners_px[i][1], window_width, window_height,
-                &ndc_x, &ndc_y);
+    pixel_to_ndc(corners_px[i][0], corners_px[i][1], window_width,
+                 window_height, &ndc_x, &ndc_y);
     vertices[*vertex_cursor] = (Vertex2D){ndc_x, ndc_y, r, g, b};
     (*vertex_cursor)++;
   }
@@ -61,7 +66,8 @@ static void append_segment_quad(Vertex2D *vertices, uint16_t *indices,
 }
 
 TextGeometry text_mesh_build(const char *text, float origin_x, float origin_y,
-                             float scale, uint32_t window_width, uint32_t window_height) {
+                             float scale, uint32_t window_width,
+                             uint32_t window_height) {
   size_t text_length = strlen(text);
 
   // worst case: every character lights all 16 segments
@@ -85,24 +91,28 @@ TextGeometry text_mesh_build(const char *text, float origin_x, float origin_y,
 
   for (size_t i = 0; i < text_length; i++) {
     const GlyphEntry *glyph = find_glyph(text[i]);
-    if (!glyph) continue; // blank -- still advances via the loop's char_origin_x below
+    if (!glyph)
+      continue; // blank -- still advances via the loop's char_origin_x below
 
     float char_origin_x = origin_x + (float)i * advance_px;
 
     for (int seg = 0; seg < 16; seg++) {
-      if (!(glyph->segments & (1u << seg))) continue;
+      if (!(glyph->segments & (1u << seg)))
+        continue;
 
       uint8_t node_a = segment_endpoints[seg][0];
       uint8_t node_b = segment_endpoints[seg][1];
 
       float ax = char_origin_x + segment_nodes[node_a].x * cell_width_px;
-      float ay = origin_y + (2.0f - segment_nodes[node_a].y) * (cell_height_px * 0.5f);
+      float ay =
+          origin_y + (2.0f - segment_nodes[node_a].y) * (cell_height_px * 0.5f);
       float bx = char_origin_x + segment_nodes[node_b].x * cell_width_px;
-      float by = origin_y + (2.0f - segment_nodes[node_b].y) * (cell_height_px * 0.5f);
+      float by =
+          origin_y + (2.0f - segment_nodes[node_b].y) * (cell_height_px * 0.5f);
 
-      append_segment_quad(vertices, indices, &vertex_cursor, &index_cursor,
-                          ax, ay, bx, by, stroke_width_px,
-                          1.0f, 1.0f, 1.0f, // white
+      append_segment_quad(vertices, indices, &vertex_cursor, &index_cursor, ax,
+                          ay, bx, by, stroke_width_px, 1.0f, 1.0f,
+                          1.0f, // white
                           window_width, window_height);
     }
   }
@@ -125,12 +135,14 @@ Mesh text_mesh_create(WGPUDevice device, WGPUQueue queue,
   vertex_buffer_desc.size = vertex_byte_size;
   vertex_buffer_desc.mappedAtCreation = WGPU_FALSE;
 
-  WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(device, &vertex_buffer_desc);
+  WGPUBuffer vertex_buffer =
+      wgpuDeviceCreateBuffer(device, &vertex_buffer_desc);
   if (!vertex_buffer) {
     fprintf(stderr, "Failed to create text vertex buffer\n");
     exit(1);
   }
-  wgpuQueueWriteBuffer(queue, vertex_buffer, 0, vertices, (size_t)vertex_byte_size);
+  wgpuQueueWriteBuffer(queue, vertex_buffer, 0, vertices,
+                       (size_t)vertex_byte_size);
 
   uint64_t index_byte_size = (uint64_t)(index_count * sizeof(uint16_t));
 
@@ -144,10 +156,72 @@ Mesh text_mesh_create(WGPUDevice device, WGPUQueue queue,
     fprintf(stderr, "Failed to create text index buffer\n");
     exit(1);
   }
-  wgpuQueueWriteBuffer(queue, index_buffer, 0, indices, (size_t)index_byte_size);
+  wgpuQueueWriteBuffer(queue, index_buffer, 0, indices,
+                       (size_t)index_byte_size);
 
   return (Mesh){.vertex_buffer = vertex_buffer,
                 .index_buffer = index_buffer,
                 .vertex_count = vertex_count,
                 .index_count = index_count};
+}
+TextMeshBuffer text_mesh_create_reserved(WGPUDevice device, WGPUQueue queue,
+                                         size_t max_chars) {
+  (void)queue; // no data to write yet -- buffers start empty
+
+  size_t vertex_capacity = max_chars * 16 * 4;
+  size_t index_capacity = max_chars * 16 * 6;
+
+  WGPUBufferDescriptor vertex_buffer_desc = {0};
+  vertex_buffer_desc.usage = WGPUBufferUsage_Vertex | WGPUBufferUsage_CopyDst;
+  vertex_buffer_desc.size = (uint64_t)(vertex_capacity * sizeof(Vertex2D));
+  vertex_buffer_desc.mappedAtCreation = WGPU_FALSE;
+
+  WGPUBuffer vertex_buffer =
+      wgpuDeviceCreateBuffer(device, &vertex_buffer_desc);
+  if (!vertex_buffer) {
+    fprintf(stderr, "Failed to create reserved text vertex buffer\n");
+    exit(1);
+  }
+
+  WGPUBufferDescriptor index_buffer_desc = {0};
+  index_buffer_desc.usage = WGPUBufferUsage_Index | WGPUBufferUsage_CopyDst;
+  index_buffer_desc.size = (uint64_t)(index_capacity * sizeof(uint16_t));
+  index_buffer_desc.mappedAtCreation = WGPU_FALSE;
+
+  WGPUBuffer index_buffer = wgpuDeviceCreateBuffer(device, &index_buffer_desc);
+  if (!index_buffer) {
+    fprintf(stderr, "Failed to create reserved text index buffer\n");
+    exit(1);
+  }
+
+  return (TextMeshBuffer){
+      .mesh = {.vertex_buffer = vertex_buffer,
+               .index_buffer = index_buffer,
+               .vertex_count = 0,
+               .index_count = 0},
+      .vertex_capacity = vertex_capacity,
+      .index_capacity = index_capacity,
+  };
+}
+
+void text_mesh_update(TextMeshBuffer *buf, WGPUQueue queue,
+                      const Vertex2D *vertices, size_t vertex_count,
+                      const uint16_t *indices, size_t index_count) {
+  if (vertex_count > buf->vertex_capacity ||
+      index_count > buf->index_capacity) {
+    fprintf(stderr,
+            "Text mesh exceeds reserved capacity (verts %zu/%zu, indices "
+            "%zu/%zu)\n",
+            vertex_count, buf->vertex_capacity, index_count,
+            buf->index_capacity);
+    exit(1);
+  }
+
+  wgpuQueueWriteBuffer(queue, buf->mesh.vertex_buffer, 0, vertices,
+                       vertex_count * sizeof(Vertex2D));
+  wgpuQueueWriteBuffer(queue, buf->mesh.index_buffer, 0, indices,
+                       index_count * sizeof(uint16_t));
+
+  buf->mesh.vertex_count = vertex_count;
+  buf->mesh.index_count = index_count;
 }

@@ -28,7 +28,8 @@ static WGPUShaderModule create_shader_module(WGPUDevice device,
 
 WGPURenderPipeline text_pipeline_create(WGPUDevice device,
                                         WGPUTextureFormat surface_format) {
-  WGPUShaderModule shader_module = create_shader_module(device, text_wgsl_source);
+  WGPUShaderModule shader_module =
+      create_shader_module(device, text_wgsl_source);
 
   // --- Vertex attribute + buffer layout ---
   WGPUVertexAttribute vertex_attrs[2] = {0};
@@ -63,7 +64,8 @@ WGPURenderPipeline text_pipeline_create(WGPUDevice device,
   primitive_state.topology = WGPUPrimitiveTopology_TriangleList;
   primitive_state.stripIndexFormat = WGPUIndexFormat_Undefined;
   primitive_state.frontFace = WGPUFrontFace_CCW;
-  primitive_state.cullMode = WGPUCullMode_None; // 2D quads -- winding doesn't matter here
+  primitive_state.cullMode =
+      WGPUCullMode_None; // 2D quads -- winding doesn't matter here
 
   // --- Color target + fragment state ---
   WGPUColorTargetState color_target = {0};

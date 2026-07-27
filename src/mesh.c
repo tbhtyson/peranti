@@ -2,9 +2,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-Mesh mesh_create(WGPUDevice device, WGPUQueue queue,
-                 const Vertex *vertices, size_t vertex_count,
-                 const uint16_t *indices, size_t index_count) {
+Mesh mesh_create(WGPUDevice device, WGPUQueue queue, const Vertex *vertices,
+                 size_t vertex_count, const uint16_t *indices,
+                 size_t index_count) {
   uint64_t vertex_byte_size = (uint64_t)(vertex_count * sizeof(Vertex));
 
   WGPUBufferDescriptor vertex_buffer_desc = {0};
@@ -12,12 +12,14 @@ Mesh mesh_create(WGPUDevice device, WGPUQueue queue,
   vertex_buffer_desc.size = vertex_byte_size;
   vertex_buffer_desc.mappedAtCreation = WGPU_FALSE;
 
-  WGPUBuffer vertex_buffer = wgpuDeviceCreateBuffer(device, &vertex_buffer_desc);
+  WGPUBuffer vertex_buffer =
+      wgpuDeviceCreateBuffer(device, &vertex_buffer_desc);
   if (!vertex_buffer) {
     fprintf(stderr, "Failed to create vertex buffer\n");
     exit(1);
   }
-  wgpuQueueWriteBuffer(queue, vertex_buffer, 0, vertices, (size_t)vertex_byte_size);
+  wgpuQueueWriteBuffer(queue, vertex_buffer, 0, vertices,
+                       (size_t)vertex_byte_size);
 
   uint64_t index_byte_size = (uint64_t)(index_count * sizeof(uint16_t));
 
@@ -31,7 +33,8 @@ Mesh mesh_create(WGPUDevice device, WGPUQueue queue,
     fprintf(stderr, "Failed to create index buffer\n");
     exit(1);
   }
-  wgpuQueueWriteBuffer(queue, index_buffer, 0, indices, (size_t)index_byte_size);
+  wgpuQueueWriteBuffer(queue, index_buffer, 0, indices,
+                       (size_t)index_byte_size);
 
   return (Mesh){.vertex_buffer = vertex_buffer,
                 .index_buffer = index_buffer,
@@ -44,4 +47,5 @@ void mesh_destroy(Mesh *mesh) {
   wgpuBufferRelease(mesh->index_buffer);
 }
 
-/* REMEMBER: wgpuQueueWriteBuffer requires 4-byte multiple sized data, a.k.a. even index_count*/
+/* REMEMBER: wgpuQueueWriteBuffer requires 4-byte multiple sized data, a.k.a.
+ * even index_count*/

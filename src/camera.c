@@ -27,20 +27,29 @@ static Vec3 free_camera_flat_forward(const FreeCamera *camera) {
   return (Vec3){sinf(camera->yaw), 0.0f, -cosf(camera->yaw)};
 }
 
-void free_camera_update(FreeCamera *camera, FreeCameraInput input, float delta_time) {
-  if (input.look_left)  camera->yaw -= LOOK_SPEED_RADIANS_PER_SEC * delta_time;
-  if (input.look_right) camera->yaw += LOOK_SPEED_RADIANS_PER_SEC * delta_time;
-  if (input.look_up)    camera->pitch += LOOK_SPEED_RADIANS_PER_SEC * delta_time;
-  if (input.look_down)  camera->pitch -= LOOK_SPEED_RADIANS_PER_SEC * delta_time;
+void free_camera_update(FreeCamera *camera, FreeCameraInput input,
+                        float delta_time) {
+  if (input.look_left)
+    camera->yaw -= LOOK_SPEED_RADIANS_PER_SEC * delta_time;
+  if (input.look_right)
+    camera->yaw += LOOK_SPEED_RADIANS_PER_SEC * delta_time;
+  if (input.look_up)
+    camera->pitch += LOOK_SPEED_RADIANS_PER_SEC * delta_time;
+  if (input.look_down)
+    camera->pitch -= LOOK_SPEED_RADIANS_PER_SEC * delta_time;
 
   // clamp away from +/-90deg -- forward/up go parallel there, same
   // gimbal case flagged when look_at's normalize was first written
-  if (camera->pitch > PITCH_LIMIT_RADIANS)  camera->pitch = PITCH_LIMIT_RADIANS;
-  if (camera->pitch < -PITCH_LIMIT_RADIANS) camera->pitch = -PITCH_LIMIT_RADIANS;
+  if (camera->pitch > PITCH_LIMIT_RADIANS)
+    camera->pitch = PITCH_LIMIT_RADIANS;
+  if (camera->pitch < -PITCH_LIMIT_RADIANS)
+    camera->pitch = -PITCH_LIMIT_RADIANS;
 
   Vec3 flat_forward = free_camera_flat_forward(camera);
   Vec3 up = {0.0f, 1.0f, 0.0f};
-  Vec3 right = vec3_cross(flat_forward, up); // already unit length -- both inputs are orthogonal unit vectors
+  Vec3 right = vec3_cross(
+      flat_forward,
+      up); // already unit length -- both inputs are orthogonal unit vectors
 
   float move_amount = MOVE_SPEED_UNITS_PER_SEC * delta_time;
 
@@ -52,10 +61,10 @@ void free_camera_update(FreeCamera *camera, FreeCameraInput input, float delta_t
     camera->position.x -= flat_forward.x * move_amount;
     camera->position.z -= flat_forward.z * move_amount;
   }
-  if(input.move_up) {
+  if (input.move_up) {
     camera->position.y += move_amount;
   }
-  if(input.move_down) {
+  if (input.move_down) {
     camera->position.y -= move_amount;
   }
   if (input.strafe_right) {

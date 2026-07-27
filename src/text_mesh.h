@@ -18,6 +18,24 @@ typedef struct {
     size_t index_count;
 } TextGeometry;
 
+typedef struct {
+    Mesh mesh;
+    size_t vertex_capacity;
+    size_t index_capacity;
+} TextMeshBuffer;
+
+// Allocates vertex/index buffers sized for `max_chars` worst-case (every
+// character lighting all 16 segments). Buffers are created once and never
+// resized -- text_mesh_update reuses them for the lifetime of the program.
+TextMeshBuffer text_mesh_create_reserved(WGPUDevice device, WGPUQueue queue, size_t max_chars);
+
+// Overwrites the existing buffers' contents via wgpuQueueWriteBuffer and
+// updates the visible vertex/index counts. Hard-fails if vertex_count or
+// index_count exceeds the capacity text_mesh_create_reserved was given.
+void text_mesh_update(TextMeshBuffer *buf, WGPUQueue queue,
+                     const Vertex2D *vertices, size_t vertex_count,
+                     const uint16_t *indices, size_t index_count);
+
 // Builds screen-space NDC quads for `text`. Each character cell is
 // `scale` pixels wide and `scale*2` tall (matches the segment grid's
 // 1x2 aspect). (origin_x, origin_y) is the pixel position of the
