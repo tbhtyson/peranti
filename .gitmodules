@@ -5,3 +5,9 @@
 	path = third_party/glad
 	url = https://github.com/Dav1dde/glad/
 	branch = glad2
+[submodule "third_party/sokol"]
+	path = third_party/sokol
+	url = https://github.com/floooh/sokol
+[submodule "third_party/sokol_tools"]
+	path = third_party/sokol_tools
+	url = https://github.com/floooh/sokol-tools

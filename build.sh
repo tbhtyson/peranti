@@ -3,37 +3,48 @@ set -e
 rm -rf build/*
 mkdir -p build
 mkdir -p generated
-{
-    printf 'static const char *triangle_wgsl_source =\n'
-    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/    "/' -e 's/$/\\n"/' shaders/triangle.wgsl
-    printf ';\n'
-} > generated/triangle_wgsl.h
 
-{
-    printf 'static const char *text_wgsl_source =\n'
-    sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' -e 's/^/    "/' -e 's/$/\\n"/' shaders/text.wgsl
-    printf ';\n'
-} > generated/text_wgsl.h
+cd third_party/sokol_tools
+./fibs build
+cd ../..
 
+SHDC_BIN="$(find third_party/sokol_tools/.fibs/dist -name sokol-shdc -type f | head -1)"
+if [ -z "$SHDC_BIN" ]; then
+    echo "error: could not find built sokol-shdc binary under third_party/sokol_tools/.fibs/dist" >&2
+    exit 1
+fi
 
 GLFW_INC="third_party/glfw/include"
 GLFW_LIB="third_party/glfw/build/src"
 
-# GLAD_INC="third_party/glad/include"
-# GLAD_SRC="third_party/glad/src/gl.c"
+SOKOL_INC="third_party/sokol"
+SOKOL_LIB="third_party/sokol"
 
-WGPU_INC="third_party/wgpu-native/ffi"
-WGPU_LIB="third_party/wgpu-native/target/release"
+read -p "Are you on MacOS? (y/N) " platform
 
-CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -Ithird_party/wgpu-native/ffi/webgpu-headers -I${GLFW_INC} -I${WGPU_INC} -Igenerated"
-LDFLAGS="-L${GLFW_LIB} -L${WGPU_LIB} -lglfw3 -l:libwgpu_native.a -lm -ldl -lpthread -lX11"
+"$SHDC_BIN" -i shaders/triangle.glsl -o generated/triangle.glsl.h -l spirv_vk:glsl410:metal_macos:hlsl5
+
+if [ "$platform" == "y" ]; then
+    EXTRA_CFLAGS="-x objective-c"
+    EXTRA_LDFLAGS="-framework Cocoa -framework QuartzCore -framework Metal -framework AudioToolbox"
+else
+    EXTRA_CFLAGS=" "
+    EXTRA_LDFLAGS="-lvulkan -ldl -lX11 -lXi -lXcursor"
+fi
+
+CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -I${GLFW_INC} -I${SOKOL_INC} -Igenerated"
+LDFLAGS="-L${GLFW_LIB} -lm -lpthread -lX11"
 
 cmake -S third_party/glfw -B third_party/glfw/build -DBUILD_SHARED_LIBS=OFF -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_BUILD_WAYLAND=OFF
 cmake --build third_party/glfw/build
-cargo build --release --manifest-path third_party/wgpu-native/Cargo.toml
+
+gcc $EXTRA_CFLAGS $CFLAGS -c "src/sokol_impl.c" -o "sokol_impl.o"
 
 for src_file in src/*.c; do
     obj_file="build/$(basename "${src_file%.c}").o"
-    gcc $CFLAGS -c "$src_file" -o "$obj_file"
+    if [ "$(basename "$src_file")" != "sokol_impl.c" ]; then
+        gcc $CFLAGS -c "$src_file" -o "$obj_file"
+    fi
 done
-gcc build/*.o $LDFLAGS -o build/peranti
+
+gcc build/*.o sokol_impl.o $LDFLAGS $EXTRA_LDFLAGS -o build/peranti
