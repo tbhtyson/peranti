@@ -6,7 +6,8 @@
 #if defined(__APPLE__)
 #define SOKOL_METAL
 #else
-#define SOKOL_GLCORE // SOKOL_VULKAN for mdern systems, SOKOL_GLCORE for compatibility
+#define SOKOL_GLCORE // SOKOL_VULKAN for mdern systems, SOKOL_GLCORE for
+                     // compatibility
 #endif
 
 #include "sokol_app.h"

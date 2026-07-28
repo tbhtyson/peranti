@@ -18,11 +18,11 @@
 
 // 1. Define global state structure
 static struct {
-  sg_pipeline pip;        // existing test-cube pipeline, UINT16
+  sg_pipeline pip; // existing test-cube pipeline, UINT16
   sg_bindings bind;
   sg_pass_action pass_action;
 
-  sg_pipeline chunk_pip;  // new — chunks use UINT32 indices
+  sg_pipeline chunk_pip; // new — chunks use UINT32 indices
   sg_bindings chunk_bind;
   uint32_t chunk_index_count;
 } state;
@@ -64,10 +64,11 @@ void init(void) {
                        PERANTI_Z_NEAR, PERANTI_Z_FAR);
 
   camera = (FreeCamera){
-    .position = {8.0f, 20.0f, 40.0f},
-    .yaw = 0.0f,
-    .pitch = -0.5f,  // look down/toward origin — adjust to your pitch convention
-};
+      .position = {8.0f, 20.0f, 40.0f},
+      .yaw = 0.0f,
+      .pitch =
+          -0.5f, // look down/toward origin — adjust to your pitch convention
+  };
 
   stm_setup(); // Initialize sokol_time
   last_time = stm_now();
@@ -75,7 +76,7 @@ void init(void) {
   sg_features features = sg_query_features(); // moved here, context now exists
   if (!features.compute) {
     printf("Compute shader support not found.\n");
-    #define NO_COMPUTE_SHADERS
+#define NO_COMPUTE_SHADERS
   }
 
   // state.bind = mesh_cube_create();
@@ -108,48 +109,52 @@ void init(void) {
       // Add depth clear action here:
       .depth = {.load_action = SG_LOADACTION_CLEAR, .clear_value = 1.0f}};
 
-
-
   // Second pipeline: same shader, same vertex layout, only index_type differs.
-// Can't reuse state.pip since a pipeline's index_type is fixed at creation.
-state.chunk_pip = sg_make_pipeline(&(sg_pipeline_desc){
-    .shader = shader,               // same shader object, reused
-    .index_type = SG_INDEXTYPE_UINT32,
-    .cull_mode = SG_CULLMODE_BACK,
-    .face_winding = SG_FACEWINDING_CCW,
-    .depth = {
-        .write_enabled = true,
-        .compare = SG_COMPAREFUNC_LESS_EQUAL,
-    },
-    .layout = {
-        .attrs = {
-            [0] = {.format = SG_VERTEXFORMAT_FLOAT3},
-            [1] = {.format = SG_VERTEXFORMAT_FLOAT4},
-        },
-    },
-});
+  // Can't reuse state.pip since a pipeline's index_type is fixed at creation.
+  state.chunk_pip = sg_make_pipeline(&(sg_pipeline_desc){
+      .shader = shader, // same shader object, reused
+      .index_type = SG_INDEXTYPE_UINT32,
+      .cull_mode = SG_CULLMODE_BACK,
+      .face_winding = SG_FACEWINDING_CCW,
+      .depth =
+          {
+              .write_enabled = true,
+              .compare = SG_COMPAREFUNC_LESS_EQUAL,
+          },
+      .layout =
+          {
+              .attrs =
+                  {
+                      [0] = {.format = SG_VERTEXFORMAT_FLOAT3},
+                      [1] = {.format = SG_VERTEXFORMAT_FLOAT4},
+                  },
+          },
+  });
 
-// Fill a test chunk -- fill however you like for now; simplest smoke test
-// is something with visible internal faces, e.g. floor half solid:
-test_chunk.coord = (ChunkCoord){0, 0, 0};
-for (int x = 0; x < CHUNK_SIZE; x++)
-  for (int y = 0; y < CHUNK_SIZE / 2; y++)
-    for (int z = 0; z < CHUNK_SIZE; z++)
-      chunk_set_block(&test_chunk, x, y, z, /* some non-air block_id_t */ 2);
+  // Fill a test chunk -- fill however you like for now; simplest smoke test
+  // is something with visible internal faces, e.g. floor half solid:
+  test_chunk.coord = (ChunkCoord){0, 0, 0};
+  for (int x = 0; x < CHUNK_SIZE; x++)
+    for (int y = 0; y < CHUNK_SIZE / 2; y++)
+      for (int z = 0; z < CHUNK_SIZE; z++)
+        chunk_set_block(&test_chunk, x, y, z, /* some non-air block_id_t */ 2);
 
-ChunkMeshData mesh = chunk_mesh_build_naive(&test_chunk,
-    NULL, NULL, NULL, NULL, NULL, NULL);  // no neighbors loaded yet
+  ChunkMeshData mesh =
+      chunk_mesh_build_naive(&test_chunk, NULL, NULL, NULL, NULL, NULL,
+                             NULL); // no neighbors loaded yet
 
-state.chunk_bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
-    .data = (sg_range){ .ptr = mesh.vertices, .size = mesh.vertex_count * sizeof(vertex_t) },
-});
-state.chunk_bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
-    .usage = { .index_buffer = true, .immutable = true },
-    .data = (sg_range){ .ptr = mesh.indices, .size = mesh.index_count * sizeof(uint32_t) },
-});
-state.chunk_index_count = mesh.index_count;
+  state.chunk_bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
+      .data = (sg_range){.ptr = mesh.vertices,
+                         .size = mesh.vertex_count * sizeof(vertex_t)},
+  });
+  state.chunk_bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
+      .usage = {.index_buffer = true, .immutable = true},
+      .data = (sg_range){.ptr = mesh.indices,
+                         .size = mesh.index_count * sizeof(uint32_t)},
+  });
+  state.chunk_index_count = mesh.index_count;
 
-chunk_mesh_free(&mesh);  // CPU copy uploaded to GPU, no longer needed
+  chunk_mesh_free(&mesh); // CPU copy uploaded to GPU, no longer needed
 }
 
 void frame(void) {
@@ -161,7 +166,8 @@ void frame(void) {
   if (count < 600 * 60 * delta_time) {
     count++;
   } else {
-    printf("%f fps, coords: %f, %f, %f\n", fps, camera.position.x, camera.position.y, camera.position.z);
+    printf("%f fps, coords: %f, %f, %f\n", fps, camera.position.x,
+           camera.position.y, camera.position.z);
     count = 0;
   }
 
@@ -196,11 +202,13 @@ void frame(void) {
   }*/
 
   sg_apply_pipeline(state.chunk_pip);
-sg_apply_bindings(&state.chunk_bind);
-Mat4 chunk_model = mat4_translate((Vec3){0.0f, 0.0f, 0.0f});  // test_chunk.coord * CHUNK_SIZE, once you have multiple chunks
-Mat4 chunk_mvp = mat4_multiply(projection, mat4_multiply(view, chunk_model));
-sg_apply_uniforms(UB_vs_params, &SG_RANGE(chunk_mvp));
-sg_draw(0, state.chunk_index_count, 1);
+  sg_apply_bindings(&state.chunk_bind);
+  Mat4 chunk_model = mat4_translate((Vec3){
+      0.0f, 0.0f,
+      0.0f}); // test_chunk.coord * CHUNK_SIZE, once you have multiple chunks
+  Mat4 chunk_mvp = mat4_multiply(projection, mat4_multiply(view, chunk_model));
+  sg_apply_uniforms(UB_vs_params, &SG_RANGE(chunk_mvp));
+  sg_draw(0, state.chunk_index_count, 1);
 
   sg_end_pass();
   sg_commit();

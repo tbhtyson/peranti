@@ -21,13 +21,15 @@ static const CornerOffset face_corners[6][4] = {
     /* -Z */ {{1, 0, 0}, {0, 0, 0}, {0, 1, 0}, {1, 1, 0}},
 };
 
-static const struct { float r, g, b; } face_color[6] = {
-    /* +X */ {1.0f, 0.0f, 0.0f},  // red
-    /* -X */ {0.0f, 1.0f, 0.0f},  // green
-    /* +Y */ {0.0f, 0.0f, 1.0f},  // blue
-    /* -Y */ {1.0f, 1.0f, 0.0f},  // yellow
-    /* +Z */ {1.0f, 0.0f, 1.0f},  // magenta
-    /* -Z */ {0.0f, 1.0f, 1.0f},  // cyan
+static const struct {
+  float r, g, b;
+} face_color[6] = {
+    /* +X */ {1.0f, 0.0f, 0.0f}, // red
+    /* -X */ {0.0f, 1.0f, 0.0f}, // green
+    /* +Y */ {0.0f, 0.0f, 1.0f}, // blue
+    /* -Y */ {1.0f, 1.0f, 0.0f}, // yellow
+    /* +Z */ {1.0f, 0.0f, 1.0f}, // magenta
+    /* -Z */ {0.0f, 1.0f, 1.0f}, // cyan
 };
 
 static const int8_t face_normal[6][3] = {
@@ -48,7 +50,8 @@ static bool is_face_visible(const Chunk *chunk, const Chunk *neighbors[6],
 
   const Chunk *neighbor = neighbors[face];
   if (!neighbor)
-    return true;  // no neighbor loaded -- for an isolated test chunk, treat as exposed
+    return true; // no neighbor loaded -- for an isolated test chunk, treat as
+                 // exposed
 
   int wx = (nx + CHUNK_SIZE) % CHUNK_SIZE;
   int wy = (ny + CHUNK_SIZE) % CHUNK_SIZE;
@@ -86,13 +89,13 @@ static void emit_face(ChunkMeshData *mesh, int x, int y, int z, int face) {
   mesh->indices[mesh->index_count++] = base + 3;
 }
 
-ChunkMeshData chunk_mesh_build_naive(const Chunk *chunk, const Chunk *neighbor_pos_x,
-                               const Chunk *neighbor_neg_x,
-                               const Chunk *neighbor_pos_y,
-                               const Chunk *neighbor_neg_y,
-                               const Chunk *neighbor_pos_z,
-                               const Chunk *neighbor_neg_z) {
-  const Chunk *neighbors[6] = {neighbor_pos_x, neighbor_neg_x, neighbor_pos_y, neighbor_neg_y, neighbor_pos_z, neighbor_neg_z};
+ChunkMeshData
+chunk_mesh_build_naive(const Chunk *chunk, const Chunk *neighbor_pos_x,
+                       const Chunk *neighbor_neg_x, const Chunk *neighbor_pos_y,
+                       const Chunk *neighbor_neg_y, const Chunk *neighbor_pos_z,
+                       const Chunk *neighbor_neg_z) {
+  const Chunk *neighbors[6] = {neighbor_pos_x, neighbor_neg_x, neighbor_pos_y,
+                               neighbor_neg_y, neighbor_pos_z, neighbor_neg_z};
   ChunkMeshData mesh = {0};
   mesh.vertices = malloc(
       98304 * sizeof(vertex_t)); // 98304 is 4096 cubes * 6 faces * 4 vertices

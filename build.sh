@@ -38,7 +38,7 @@ LDFLAGS="-L${GLFW_LIB} -lm -lpthread -lX11"
 cmake -S third_party/glfw -B third_party/glfw/build -DBUILD_SHARED_LIBS=OFF -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_BUILD_WAYLAND=OFF
 cmake --build third_party/glfw/build
 
-gcc $EXTRA_CFLAGS $CFLAGS -c "src/sokol_impl.c" -o "sokol_impl.o"
+gcc $EXTRA_CFLAGS $CFLAGS -c "src/sokol_impl.c" -o "build/sokol_impl.o"
 
 for src_file in src/*.c; do
     obj_file="build/$(basename "${src_file%.c}").o"
@@ -47,4 +47,4 @@ for src_file in src/*.c; do
     fi
 done
 
-gcc build/*.o sokol_impl.o $LDFLAGS $EXTRA_LDFLAGS -o build/peranti
+gcc build/*.o $LDFLAGS $EXTRA_LDFLAGS -o build/peranti
