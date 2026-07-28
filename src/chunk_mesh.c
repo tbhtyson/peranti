@@ -74,9 +74,9 @@ static void emit_face(ChunkMeshData *mesh, int x, int y, int z, int face) {
         .g = 1.0f,
         .b = 1.0f,
         .a = 1.0f,*/
-        .r = face_color[face].r,
-        .g = face_color[face].g,
-        .b = face_color[face].b,
+        .r = face_color[face].r /*+ ((((float)rand() / (float)RAND_MAX) / 10.0f) - 0.1f)*/,
+        .g = face_color[face].g /*+ ((((float)rand() / (float)RAND_MAX) / 10.0f) - 0.1f)*/,
+        .b = face_color[face].b /*+ ((((float)rand() / (float)RAND_MAX) / 10.0f) - 0.1f)*/,
         .a = 1.0f,
     };
   }
