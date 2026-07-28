@@ -110,3 +110,10 @@ Mat4 mat4_look_at(Vec3 eye, Vec3 target, Vec3 up) {
 
   return mat;
 }
+Mat4 mat4_translate(Vec3 t) {
+  Mat4 result = mat4_identity();
+  result.m[12] = t.x;
+  result.m[13] = t.y;
+  result.m[14] = t.z;
+  return result;
+}

@@ -28,8 +28,8 @@ if [ "$platform" == "y" ]; then
     EXTRA_CFLAGS="-x objective-c"
     EXTRA_LDFLAGS="-framework Cocoa -framework QuartzCore -framework Metal -framework AudioToolbox"
 else
-    EXTRA_CFLAGS=" "
-    EXTRA_LDFLAGS="-lvulkan -ldl -lX11 -lXi -lXcursor"
+  EXTRA_CFLAGS=" "
+    EXTRA_LDFLAGS="-lvulkan -lGL -ldl -lX11 -lXi -lXcursor"
 fi
 
 CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -I${GLFW_INC} -I${SOKOL_INC} -Igenerated"
