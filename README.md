@@ -3,7 +3,7 @@ a luanti compatible (planned for next month) voxel game engine written using sok
 ## Warning: no windows support yet! use at your own risk!
 ### build how? build.sh gives an error/running build/peranti gives me errors!
 maybe run this: `git submodule update --init --recursive` then `./build.sh` and check build directory for new executables.
-Also make sure you have vulkan/metal build utils, vulkan validation layers and x11 build utils if on linux.
+Also make sure you have vulkan/metal/opengl build utils, vulkan validation layers and x11 build utils if on linux.
 ### how i contribute?
 Implement an item on the status list in a way that is good enough (or better than my current implementation)
 ### Status (features)
@@ -14,9 +14,9 @@ Implement an item on the status list in a way that is good enough (or better tha
 | Multiplayer | [ ] |
 | Chat | [ ] |
 | Textures | [ ] |
-| Rendering | [ ] |
+| Rendering | [x] |
 | Frustum Culling | [ ] |
 | Greedy Meshing | [ ] |
-| Face Culling | [ ] |
+| Face Culling | [x] |
 
 I just restarted this project, my code discipline wasn't enough, so nothing's here anymore
