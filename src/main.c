@@ -1,3 +1,4 @@
+#include "world.h"
 #include "camera.h"
 #include "chunk.h"
 #include "chunk_mesh.h"
@@ -27,7 +28,15 @@ static struct {
   uint32_t chunk_index_count;
 } state;
 
-static Chunk test_chunk;
+// in main.c's state, alongside chunk_pip:
+typedef struct {
+    sg_bindings bind;
+    uint32_t index_count;
+    Vec3 world_offset; // chunk coord * CHUNK_SIZE, precomputed once at build time
+} ChunkRenderData;
+
+static ChunkRenderData chunk_renders[WORLD_CHUNKS_X][WORLD_CHUNKS_Y][WORLD_CHUNKS_Z];
+
 
 /*static const Vec3 cube_positions[] = {
     {0.0f, 0.0f, 0.0f},
@@ -39,6 +48,7 @@ static Chunk test_chunk;
 static uint64_t last_time = 0;
 static float fps = 0.0f;
 int count = 0;
+static World world;
 
 static Mat4 projection;
 static FreeCamera
@@ -57,6 +67,7 @@ void init(void) {
   sg_setup(&(sg_desc){
       .environment = sglue_environment(),
       .logger.func = slog_func,
+      .buffer_pool_size = 4096,
   });
   // in init(), after sg_setup():
   projection =
@@ -131,30 +142,39 @@ void init(void) {
           },
   });
 
-  // Fill a test chunk -- fill however you like for now; simplest smoke test
-  // is something with visible internal faces, e.g. floor half solid:
-  test_chunk.coord = (ChunkCoord){0, 0, 0};
-  for (int x = 0; x < CHUNK_SIZE; x++)
-    for (int y = 0; y < CHUNK_SIZE / 2; y++)
-      for (int z = 0; z < CHUNK_SIZE; z++)
-        chunk_set_block(&test_chunk, x, y, z, /* some non-air block_id_t */ 2);
+  world_init_flat_test(&world);
 
-  ChunkMeshData mesh =
-      chunk_mesh_build_naive(&test_chunk, NULL, NULL, NULL, NULL, NULL,
-                             NULL); // no neighbors loaded yet
+  for (int cx = 0; cx < WORLD_CHUNKS_X; cx++) {
+  for (int cy = 0; cy < WORLD_CHUNKS_Y; cy++)
+  for (int cz = 0; cz < WORLD_CHUNKS_Z; cz++) {
+    const Chunk *chunk = world_chunk_at(&world, cx, cy, cz);
+    ChunkMeshData mesh = chunk_mesh_build_naive(
+        chunk,
+        world_chunk_at(&world, cx + 1, cy, cz), world_chunk_at(&world, cx - 1, cy, cz),
+        world_chunk_at(&world, cx, cy + 1, cz), world_chunk_at(&world, cx, cy - 1, cz),
+        world_chunk_at(&world, cx, cy, cz + 1), world_chunk_at(&world, cx, cy, cz - 1)
+    );
 
-  state.chunk_bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
-      .data = (sg_range){.ptr = mesh.vertices,
-                         .size = mesh.vertex_count * sizeof(vertex_t)},
-  });
-  state.chunk_bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
-      .usage = {.index_buffer = true, .immutable = true},
-      .data = (sg_range){.ptr = mesh.indices,
-                         .size = mesh.index_count * sizeof(uint32_t)},
-  });
-  state.chunk_index_count = mesh.index_count;
+    ChunkRenderData *render = &chunk_renders[cx][cy][cz];
+    if(mesh.vertex_count == 0) {
+      render->index_count = 0;
+    } else {
+    render->bind.vertex_buffers[0] = sg_make_buffer(&(sg_buffer_desc){
+        .data = (sg_range){.ptr = mesh.vertices, .size = mesh.vertex_count * sizeof(vertex_t)},
+    });
+    render->bind.index_buffer = sg_make_buffer(&(sg_buffer_desc){
+        .usage = {.index_buffer = true, .immutable = true},
+        .data = (sg_range){.ptr = mesh.indices, .size = mesh.index_count * sizeof(uint32_t)},
+    });
+    render->index_count = mesh.index_count;
+    render->world_offset = (Vec3){ (float)(cx * CHUNK_SIZE), (float)(cy * CHUNK_SIZE), (float)(cz * CHUNK_SIZE) };
 
-  chunk_mesh_free(&mesh); // CPU copy uploaded to GPU, no longer needed
+    chunk_mesh_free(&mesh);
+    }
+  }
+}
+
+  
 }
 
 void frame(void) {
@@ -202,13 +222,19 @@ void frame(void) {
   }*/
 
   sg_apply_pipeline(state.chunk_pip);
-  sg_apply_bindings(&state.chunk_bind);
-  Mat4 chunk_model = mat4_translate((Vec3){
-      0.0f, 0.0f,
-      0.0f}); // test_chunk.coord * CHUNK_SIZE, once you have multiple chunks
-  Mat4 chunk_mvp = mat4_multiply(projection, mat4_multiply(view, chunk_model));
-  sg_apply_uniforms(UB_vs_params, &SG_RANGE(chunk_mvp));
-  sg_draw(0, state.chunk_index_count, 1);
+for (int cx = 0; cx < WORLD_CHUNKS_X; cx++) {
+  for(int cy = 0; cy < WORLD_CHUNKS_Y; cy++) {
+  for (int cz = 0; cz < WORLD_CHUNKS_Z; cz++) {
+    ChunkRenderData *render = &chunk_renders[cx][cy][cz];
+    if (render->index_count == 0) continue; // fully interior, nothing to render
+    sg_apply_bindings(&render->bind);
+    Mat4 model = mat4_translate(render->world_offset);
+    Mat4 mvp = mat4_multiply(projection, mat4_multiply(view, model));
+    sg_apply_uniforms(UB_vs_params, &SG_RANGE(mvp));
+    sg_draw(0, render->index_count, 1);
+  }
+  }
+}
 
   sg_end_pass();
   sg_commit();
