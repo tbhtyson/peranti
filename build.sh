@@ -32,8 +32,8 @@ else
     EXTRA_LDFLAGS="-lvulkan -lGL -ldl -lX11 -lXi -lXcursor"
 fi
 
-CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -I${GLFW_INC} -I${SOKOL_INC} -Igenerated"
-LDFLAGS="-L${GLFW_LIB} -lm -lpthread -lX11"
+CFLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion -O3 -march=native -flto -falign-loops=32 -I${GLFW_INC} -I${SOKOL_INC} -Igenerated"
+LDFLAGS="-L${GLFW_LIB} -lm -lpthread -lX11 -flto -fno-plt"
 
 cmake -S third_party/glfw -B third_party/glfw/build -DBUILD_SHARED_LIBS=OFF -DGLFW_BUILD_EXAMPLES=OFF -DGLFW_BUILD_TESTS=OFF -DGLFW_BUILD_DOCS=OFF -DGLFW_BUILD_WAYLAND=OFF
 cmake --build third_party/glfw/build
