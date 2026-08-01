@@ -59,6 +59,9 @@ void input_event(const sapp_event *ev) {
     mouse_delta_x += ev->mouse_dx;
     mouse_delta_y += ev->mouse_dy;
   }
+  if (ev->type == SAPP_EVENTTYPE_MOUSE_DOWN && !sapp_mouse_locked()) {
+    sapp_lock_mouse(true);
+  }
 }
 
 void init(void) {

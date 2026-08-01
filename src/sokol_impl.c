@@ -3,11 +3,15 @@
 // sokol_impl.c
 #define SOKOL_IMPL
 #define SOKOL_TIME_IMPL
+
 #if defined(__APPLE__)
 #define SOKOL_METAL
+#elif defined(_WIN32)
+#define SOKOL_D3D11
+#elif defined(SOKOL_USE_VULKAN)
+#define SOKOL_VULKAN
 #else
-#define SOKOL_GLCORE // SOKOL_VULKAN for mdern systems, SOKOL_GLCORE for
-                     // compatibility
+#define SOKOL_GLCORE
 #endif
 
 #include "sokol_app.h"
