@@ -15,12 +15,10 @@ typedef struct {
     bool move_backward;
     bool strafe_left;
     bool strafe_right;
-    bool look_left;
-    bool look_right;
-    bool look_up;
-    bool look_down;
     bool move_up;
     bool move_down;
+    float delta_x;
+    float delta_y;
 } FreeCameraInput;
 
 FreeCamera free_camera_init(Vec3 position, float yaw, float pitch);
