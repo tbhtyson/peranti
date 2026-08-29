@@ -1,22 +1,13 @@
 # peranti
-a luanti compatible (planned for next month) voxel game engine written using sokol in c that is highly performant (also malay word for device)
+A luanti renderer rewrite written using sokol in c that is highly performant (also malay word for device)
 ## Warning: no windows support yet! use at your own risk!
+also make sure your luanti settings are opengl, not ES and that you have opengl 3.3+ as your version
 ### build how? build.sh gives an error/running build/peranti gives me errors!
-maybe run this: `git submodule update --init --recursive` then `./build.sh` and check build directory for new executables.
-Also make sure you have vulkan/metal/opengl build utils, vulkan validation layers and x11 build utils if on linux.
+Maybe run this: `git submodule update --init --recursive` then `./build-zig.sh` and check build directory for new executables.
+Also make sure you have luanti source code.
+To install this renderer patch, you must have luanti's source code, and put the replacement files in luanti/src/client alongside the src folder of this project as peranti
 ### how i contribute?
 Implement an item on the status list in a way that is good enough (or better than my current implementation)
 ### Status (features)
-| Feature | Is here? (x for done, <br> - for develompent <br> underway/soon, blank <br> for later) |
-| :------- | :---------------: |
-| World Loading | [ ] |
-| Mods | [ ] |
-| Multiplayer | [ ] |
-| Chat | [ ] |
-| Textures | [ ] |
-| Rendering | [x] |
-| Frustum Culling | [ ] |
-| Greedy Meshing | [ ] |
-| Face Culling | [x] |
 
 I just restarted this project, my code discipline wasn't enough, so nothing's here anymore

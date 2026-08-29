@@ -11,3 +11,6 @@
 [submodule "third_party/sokol_tools"]
 	path = third_party/sokol_tools
 	url = https://github.com/floooh/sokol-tools
+[submodule "third_party/csrp"]
+	path = third_party/csrp
+	url = https://github.com/cocagne/csrp

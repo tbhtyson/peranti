@@ -3,6 +3,8 @@
 -Ithird_party/wgpu-native/ffi
 -Ithird_party/wgpu-native/ffi/webgpu-headers
 -Ithird_party/sokol
+-Ithird_party/gmp/mini-gmp
+-Ithird_party/csrp
 -Igenerated
 -std=c17
 -Wall
