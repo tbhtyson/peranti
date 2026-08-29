@@ -671,6 +671,7 @@ void Client::step(float dtime)
 							// expects flat float arrays, but IVertexBuffer only exposes per-vertex
 							// accessors (getPosition(i), getNormal(i), getTCoords(i)), not a raw
 							// pointer of a known layout. This is genuinely a copy, not a cast.
+							// Probably ccw winding, but idk
 							std::vector<float> positions(vertex_count * 3);
 							std::vector<float> normals(vertex_count * 3);
 							std::vector<float> uvs(vertex_count * 2);
