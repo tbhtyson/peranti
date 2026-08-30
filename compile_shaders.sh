@@ -1,5 +1,6 @@
 build_shaders() {
   cd src/third_party/sokol_tools
+  ./fibs config
   ./fibs build
   cd ../../..
   SHDC_BIN="$(find src/third_party/sokol_tools/.fibs/dist -name sokol-shdc -type f | head -1)"
