@@ -1,8 +1,0 @@
-.fibs/
-.vscode/
-CMakeLists.txt
-CMakePresets.json
-zig-*/
-.zig-*/
-test/out/
-sokol-shdc
