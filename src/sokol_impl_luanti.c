@@ -28,9 +28,9 @@
 #define SOKOL_TIME_IMPL
 #define SOKOL_GLCORE
 
-#include "sokol_gfx.h"
-#include "sokol_log.h"
-#include "sokol_time.h"
+#include "third_party/sokol/sokol_gfx.h"
+#include "third_party/sokol/sokol_log.h"
+#include "third_party/sokol/sokol_time.h"
 
 // sokol_gfx.h's implementation block is guarded only by `#ifdef SOKOL_GFX_IMPL`
 // (unlike its declaration section, which has a proper SOKOL_GFX_INCLUDED

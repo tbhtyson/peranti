@@ -22,7 +22,7 @@
 #include "gettext.h"
 
 
-#include "peranti/all.c" //added by tbhtyson for renderer rewrite
+#include "peranti/all.h" //added by tbhtyson for renderer rewrite
 
 #include <ICameraSceneNode.h>
 #include <IGUIFont.h>

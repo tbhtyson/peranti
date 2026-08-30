@@ -1,0 +1,24 @@
+[submodule "ext/pystring"]
+	path = ext/pystring
+	url = https://github.com/imageworks/pystring.git
+[submodule "ext/getopt"]
+	path = ext/getopt
+	url = https://github.com/wc-duck/getopt.git
+[submodule "ext/SPIRV-Cross"]
+	path = ext/SPIRV-Cross
+	url = https://github.com/KhronosGroup/SPIRV-Cross.git
+[submodule "ext/glslang"]
+	path = ext/glslang
+	url = https://github.com/KhronosGroup/glslang.git
+[submodule "SPIRV-Tools"]
+	path = ext/SPIRV-Tools
+	url = https://github.com/KhronosGroup/SPIRV-Tools.git
+[submodule "ext/SPIRV-Headers"]
+	path = ext/SPIRV-Headers
+	url = https://github.com/KhronosGroup/SPIRV-Headers
+[submodule "ext/fmt"]
+	path = ext/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "ext/tint-extract"]
+	path = ext/tint-extract
+	url = https://github.com/floooh/tint-extract

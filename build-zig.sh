@@ -28,6 +28,9 @@ else
   exit 1
 fi
 
+mkdir -p src/generated
+./compile_shaders.sh
+
 SOKOL_INC="third_party/sokol"
 WARN_FLAGS="-Wall -Wextra -Wpedantic -Wshadow -Wconversion"
 INCLUDES="-Isrc -I${SOKOL_INC} -Ithird_party/gmp/mini-gmp"

@@ -28,6 +28,7 @@
 
 #include "peranti/sokol_impl_luanti.c"// added by tbhtyson for renderer rewrite
 #include "peranti/all.c"              // added by tbhtyson for renderer rewrite
+PerantiGLState pre_sokol_state;       // added by tbhtyson for renderer rewrite
 
 RenderingEngine *RenderingEngine::s_singleton = nullptr;
 
@@ -234,7 +235,15 @@ RenderingEngine::RenderingEngine(MyEventReceiver *receiver)
 	// fsaa is already computed a few lines above this point in the constructor
 	desc.environment.defaults.sample_count = fsaa > 0 ? fsaa : 1;
 	desc.logger.func = slog_func;
+	// sg_setup() changes real, shared GL state (depth func, blend, VAO/buffer
+	// bindings) that Irrlicht's own CacheHandler independently caches and
+	// never re-queries -- see CONVENTIONS.md / gl_state_guard.h for why.
+	// Save immediately before, restore immediately after, so Irrlicht's
+	// subsequent rendering sees exactly the state it expects.
+
+	peranti_gl_state_save(&pre_sokol_state);
 	sg_setup(&desc);
+	peranti_gl_state_restore(&pre_sokol_state);
 
 
 	// end of added code

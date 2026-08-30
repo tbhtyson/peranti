@@ -13,3 +13,5 @@ client.cpp
         size_t index_count;
     } PerantiRawMesh;
     add peranti_extract_mapblock_mesh(int16_t mapblockX, int16_t mapblockY, int16_t mapblockZ, const PerantiRawMesh *mesh_data)
+game.cpp
+    peranti_draw_frame(void);

@@ -76,6 +76,8 @@
 #include <sstream>
 #include <cmath>
 
+#include "peranti/all.h"
+
 extern gui::IGUIEnvironment* guienv;
 
 /*

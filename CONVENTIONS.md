@@ -129,6 +129,39 @@ C++ standards levels, prefer named-local + field-assignment (rule #2's
 that crosses the render/ boundary, and if using them at all, keep field
 order matching the struct's declaration order.
 
+## 8. Prefer memset over `= {0}` for sokol structs specifically
+
+`= {0}` is safe in C++ when a struct's own first field (recursively,
+through any nested struct) is a plain integer type -- `sg_desc` and
+`sg_pass` both start with `uint32_t _start_canary`, so `= {0}` is fine for
+those. But `sg_pass_action`'s first field is `colors[0].load_action`, an
+*enum* with no leading canary to absorb the literal `0` -- and C++
+disallows the implicit int-to-enum conversion this requires inside a
+brace-initializer, where C allows it freely. This was found by the actual
+C++ graft dry run failing on code that compiled fine as plain C -- worse,
+the same code would have been a *silent semantic bug* even under C, since
+`{0}`'s zero-value resolves to `_SG_LOADACTION_DEFAULT`, which sokol's own
+docs confirm means `SG_LOADACTION_CLEAR`, not "leave existing content
+alone."
+
+Rather than case-by-case verifying which sokol structs happen to be safe,
+default to `memset(&thing, 0, sizeof(thing));` for any sokol struct you're
+zero-filling, then set the fields you actually care about explicitly by
+name. `memset` is a byte-level operation, not a typed aggregate
+initializer, so it never hits this restriction regardless of what type
+the struct's first field happens to be.
+
+```c
+// RISKY -- fine for some sokol structs, a hard C++ error for others,
+// and can silently pick the wrong "default" value even under C
+sg_pass_action pass_action = {0};
+
+// SAFE -- works for every sokol struct, no need to know its field order
+sg_pass_action pass_action;
+memset(&pass_action, 0, sizeof(pass_action));
+pass_action.colors[0].load_action = SG_LOADACTION_LOAD;
+```
+
 ## Enforcement
 
 Run `./compat_lint.sh` before committing. It greps `src/render/` (and

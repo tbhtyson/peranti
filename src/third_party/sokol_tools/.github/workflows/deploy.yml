@@ -1,0 +1,134 @@
+name: Deploy
+
+on: workflow_dispatch
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: true
+    - uses: denoland/setup-deno@v2
+    - name: build
+      run: |
+        ./fibs config win-vstudio-release
+        ./fibs build
+        md5sum .fibs/dist/win-vstudio-release/sokol-shdc.exe
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: win-vstudio-release
+        path: .fibs/dist/win-vstudio-release/sokol-shdc.exe
+        retention-days: 1
+  mac_intel:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: true
+    - uses: ashutoshvarma/setup-ninja@master
+    - uses: denoland/setup-deno@v2
+    - name: build
+      run: |
+        ./fibs config macos-x64-ninja-release
+        ./fibs build
+        md5 .fibs/dist/macos-x64-ninja-release/sokol-shdc
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-x64-ninja-release
+        path: .fibs/dist/macos-x64-ninja-release/sokol-shdc
+        retention-days: 1
+  mac_arm:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: true
+    - uses: ashutoshvarma/setup-ninja@master
+    - uses: denoland/setup-deno@v2
+    - name: build
+      run: |
+        ./fibs config macos-arm-ninja-release
+        ./fibs build
+        md5 .fibs/dist/macos-arm-ninja-release/sokol-shdc
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: macos-arm-ninja-release
+        path: .fibs/dist/macos-arm-ninja-release/sokol-shdc
+        retention-days: 1
+  linux_intel:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: build
+      run: |
+        ./build_docker.sh
+        md5sum sokol-shdc
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-x64-ninja-release
+        path: sokol-shdc
+        retention-days: 1
+  linux_arm:
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true
+    - name: build
+      run: |
+        ./build_docker.sh
+        md5sum sokol-shdc
+    - name: upload
+      uses: actions/upload-artifact@v4
+      with:
+        name: linux-arm-ninja-release
+        path: sokol-shdc
+        retention-days: 1
+  deploy:
+    needs: [windows, mac_intel, mac_arm, linux_intel, linux_arm]
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        repository: floooh/sokol-tools-bin
+        ssh-key: ${{ secrets.GHACTIONS_PUSH }}
+    - uses: actions/download-artifact@v4
+      with:
+        name: win-vstudio-release
+        path: bin/win32
+    - uses: actions/download-artifact@v4
+      with:
+        name: macos-x64-ninja-release
+        path: bin/osx
+    - uses: actions/download-artifact@v4
+      with:
+        name: macos-arm-ninja-release
+        path: bin/osx_arm64
+    - uses: actions/download-artifact@v4
+      with:
+        name: linux-x64-ninja-release
+        path: bin/linux
+    - uses: actions/download-artifact@v4
+      with:
+        name: linux-arm-ninja-release
+        path: bin/linux_arm64
+    - name: "commit and push"
+      run: |
+        md5sum bin/win32/sokol-shdc.exe
+        md5sum bin/osx/sokol-shdc
+        md5sum bin/osx_arm64/sokol-shdc
+        md5sum bin/linux/sokol-shdc
+        md5sum bin/linux_arm64/sokol-shdc
+        chmod a+x bin/osx/sokol-shdc bin/osx_arm64/sokol-shdc bin/linux/sokol-shdc bin/linux_arm64/sokol-shdc
+        git config user.email "none"
+        git config user.name "GH Action"
+        git add .
+        git commit -m "updated (${{ github.run_number }})"
+        git push
