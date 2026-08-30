@@ -1,0 +1,6 @@
+[submodule "src/third_party/sokol"]
+	path = src/third_party/sokol
+	url = https://github.com/floooh/sokol
+[submodule "src/third_party/sokol_tools"]
+	path = src/third_party/sokol_tools
+	url = https://github.com/floooh/sokol-tools
