@@ -51,8 +51,8 @@ while IFS= read -r -d '' src_file; do
 done < <(find src/core src/render -name "*.c" -print0 2>/dev/null)
 
 echo
-echo "== compiling src/sokol_impl_luanti.c and src/sokol_impl_standalone.c as plain C =="
-for f in src/sokol_impl_luanti.c src/sokol_impl_standalone.c; do
+echo "== compiling src/sokol_impl_luanti.c as plain C =="
+for f in src/sokol_impl_luanti.c; do
   [ -f "$f" ] || continue
   echo "  cc  $f"
   if ! zig cc $WARN_FLAGS $INCLUDES -c "$f" -o "$OUT_DIR/$(basename "${f%.c}").o" 2>&1; then
@@ -73,7 +73,7 @@ echo "== graft dry run: src/all.c as C++, no extern \"C\" wrapping =="
 echo "== (this is the actual check that matters -- confirms every file"
 echo "==  under core/ and render/ survives being #include'd into a"
 echo "==  Luanti .cpp exactly the way the real graft call sites do)"
-cp src/all.c "$OUT_DIR/all_dryrun.cpp"
+cat src/sokol_impl_luanti.c src/all.c > "$OUT_DIR/all_dryrun.cpp"
 if ! zig c++ $WARN_FLAGS $INCLUDES -c "$OUT_DIR/all_dryrun.cpp" -o "$OUT_DIR/all_cpp.o" 2>&1; then
   echo "!!! FAILED: src/all.c (as C++ -- this WILL break inside Luanti's real"
   echo "!!! build too, since this dry run mirrors the actual graft exactly)"
