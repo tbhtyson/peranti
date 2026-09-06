@@ -1,0 +1,6 @@
+[submodule "src/third_party/volk"]
+	path = src/third_party/volk
+	url = https://github.com/zeux/volk
+[submodule "src/third_party/cglm"]
+	path = src/third_party/cglm
+	url = https://github.com/recp/cglm

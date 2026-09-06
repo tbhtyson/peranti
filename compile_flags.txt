@@ -1,8 +1,8 @@
 -Isrc
--Ithird_party/glfw/include
--Ithird_party/sokol
--Ithird_party/gmp/mini-gmp
+-Isrc/third_party/
+-Isrc/third_party/cglm/include
 -Igenerated
+-Ibuild
 -I./
 -std=c17
 -Wall
