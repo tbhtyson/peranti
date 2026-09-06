@@ -41,7 +41,7 @@ PKG_CFLAGS := $(shell pkg-config --cflags $(PKGS))
 PKG_LIBS   := $(shell pkg-config --libs $(PKGS))
 
 # -I$(BUILD) so `#include "shaders/shader.vert.spv.inc"` resolves against the generated files.
-CFLAGS   := $(CSTD)   -Wall -Wextra -Isrc -Isrc/third_party -Isrc/third_party/cglm/include -I$(BUILD) -MMD -MP $(PKG_CFLAGS)
+CFLAGS   := $(CSTD)   -Wall -Wextra -Isrc -Isrc/third_party -Isrc/third_party/cglm/include -I$(BUILD) -MMD -MP $(PKG_CFLAGS) -g
 CXXFLAGS := $(CXXSTD)               -Isrc -Isrc/third_party -Isrc/third_party/cglm/include -I$(BUILD) -MMD -MP $(PKG_CFLAGS)
 
 # volk is vendored/compiled directly (see C_SRC). shaderc_combined is gone too, now that
