@@ -3,10 +3,9 @@
 
 layout(location = 0) in vec3 inNormal;
 layout(location = 1) in vec2 inUV;
-layout(location = 2) in vec3 inFactor;
-layout(location = 3) in vec3 inLightVec;
-layout(location = 4) in vec3 inViewVec;
-layout(location = 5) flat in uint inInstanceIndex;
+layout(location = 2) in vec3 inLightVec;
+layout(location = 3) in vec3 inViewVec;
+layout(location = 4) flat in uint inInstanceIndex;
 
 layout(location = 0) out vec4 outColor;
 
@@ -21,7 +20,7 @@ void main() {
     vec3 diffuse  = vec3(max(dot(N, L), 0.0025));
     vec3 specular = vec3(pow(max(dot(R, V), 0.0), 16.0) * 0.75);
 
-    vec3 color = texture(textures[nonuniformEXT(inInstanceIndex)], inUV).rgb * inFactor;
+    vec3 color = texture(textures[nonuniformEXT(0)], inUV).rgb;
 
     outColor = vec4(diffuse * color + specular, 1.0);
 }

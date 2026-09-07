@@ -8,10 +8,9 @@ layout(location = 2) in vec2 inUV;
 
 layout(location = 0) out vec3 outNormal;
 layout(location = 1) out vec2 outUV;
-layout(location = 2) out vec3 outFactor;
-layout(location = 3) out vec3 outLightVec;
-layout(location = 4) out vec3 outViewVec;
-layout(location = 5) flat out uint outInstanceIndex;
+layout(location = 2) out vec3 outLightVec;
+layout(location = 3) out vec3 outViewVec;
+layout(location = 4) flat out uint outInstanceIndex;
 
 layout(buffer_reference, scalar) readonly buffer ShaderData {
     mat4 projection;
@@ -32,7 +31,6 @@ void main() {
     outUV = inUV;
     gl_Position = pc.data.projection * pc.data.view * modelMat * vec4(inPos, 1.0);
 
-    outFactor = vec3(pc.data.selected == gl_InstanceIndex ? 3.0 : 1.0);
     outInstanceIndex = gl_InstanceIndex;
 
     vec4 fragPos = pc.data.view * modelMat * vec4(inPos, 1.0);

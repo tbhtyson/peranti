@@ -1,8 +1,10 @@
+#include <SDL3/SDL_scancode.h>
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #define VK_NO_PROTOTYPES
 #include "types.h"
 #include "vk_mem_alloc.h"
@@ -107,11 +109,6 @@ static SwapchainState sc = {0};
 // free()-ing NULL) is a defined no-op -- so the "destroy old, then create
 // new" sequence below just skips the "destroy old" half the first time.
 static void recreateSwapchain(void) {
-  static int recreateCount = 0;
-  fprintf(stderr, "recreateSwapchain() call #%d, windowSize=(%d,%d)\n",
-          ++recreateCount, sc.windowSize[0], sc.windowSize[1]);
-
-
   chkvk(vkDeviceWaitIdle(sc.device));
 
   VkSurfaceCapabilitiesKHR surfaceCaps = {0};
@@ -359,6 +356,11 @@ int main(int argc, char *argv[]) {
   SDL_Window *window = SDL_CreateWindow(
       "How to Vulkan", 1280u, 720u, SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE);
 
+  // Lock the cursor to the window and hide it -- standard for a first-person
+  // game. SDL keeps reporting relative motion (event.motion.xrel/yrel) even
+  // when the (now invisible) cursor would otherwise hit a screen edge.
+  chk(SDL_SetWindowRelativeMouseMode(window, true));
+
   sc.device = device;
   sc.allocator = allocator;
   sc.physicalDevice = devices[deviceIndex];
@@ -434,13 +436,44 @@ int main(int argc, char *argv[]) {
 
   // loading meshes
   static const Vertex vertices[] = {
-      {{-0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}}, // bottom-left
-      {{0.5f, -0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},  // bottom-right
-      {{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},   // top-right
-      {{-0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},  // top-left
+      // +Z (front)
+      {{-0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f}},
+      {{0.5f, -0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+      // -Z (back)
+      {{0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 0.0f}},
+      {{-0.5f, -0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 0.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {1.0f, 1.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, -1.0f}, {0.0f, 1.0f}},
+      // +X (right)
+      {{0.5f, -0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+      {{0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+      {{0.5f, 0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+      {{0.5f, 0.5f, 0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+      // -X (left)
+      {{-0.5f, -0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
+      {{-0.5f, -0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+      {{-0.5f, 0.5f, 0.5f}, {-1.0f, 0.0f, 0.0f}, {1.0f, 1.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {-1.0f, 0.0f, 0.0f}, {0.0f, 1.0f}},
+      // +Y (top)
+      {{-0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+      {{0.5f, 0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
+      {{0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}},
+      {{-0.5f, 0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}},
+      // -Y (bottom)
+      {{-0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 0.0f}},
+      {{0.5f, -0.5f, -0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 0.0f}},
+      {{0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {1.0f, 1.0f}},
+      {{-0.5f, -0.5f, 0.5f}, {0.0f, -1.0f, 0.0f}, {0.0f, 1.0f}},
   };
   static const uint16_t indices[] = {
-      0, 1, 2, 2, 3, 0,
+      0,  1,  2,  2,  3,  0,  // +Z
+      4,  5,  6,  6,  7,  4,  // -Z
+      8,  9,  10, 10, 11, 8,  // +X
+      12, 13, 14, 14, 15, 12, // -X
+      16, 17, 18, 18, 19, 16, // +Y
+      20, 21, 22, 22, 23, 20, // -Y
   };
 
   const VkDeviceSize indexCount = {sizeof(indices) / sizeof(uint16_t)};
@@ -604,7 +637,7 @@ int main(int argc, char *argv[]) {
   VkDescriptorSet descriptorSetTex = {VK_NULL_HANDLE};
   chkvk(vkAllocateDescriptorSets(device, &descriptorSetAI, &descriptorSetTex));
 
-  const uint8_t whitePixel[4] = {255, 255, 255, 255};
+  const uint8_t whitePixel[4] = {25, 255, 25, 255};
   VkBufferCreateInfo texStagingBufferCI = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
       .size = sizeof(whitePixel),
@@ -766,13 +799,13 @@ int main(int argc, char *argv[]) {
 
   // shaders
 
-  static const uint32_t vertShaderSpv[] = {
+  static const uint32_t vertShaderSpv[] =
 #include "shaders/shader.vert.spv.inc"
-  };
+  ;
 
-  static const uint32_t fragShaderSpv[] = {
+  static const uint32_t fragShaderSpv[] =
 #include "shaders/shader.frag.spv.inc"
-  };
+  ;
 
   VkShaderModuleCreateInfo vertModuleCI = {
       // no use in vulkan 1.4, so in a few years, remove this
@@ -914,12 +947,65 @@ int main(int argc, char *argv[]) {
 
   uint64_t lastTime = {SDL_GetTicks()};
   bool quit = {false};
+  bool mouseCaptured = {true}; // matches the initial SDL_SetWindowRelativeMouseMode(window, true) above
   uint32_t frameIndex = {0};
   uint32_t imageIndex = {0};
   ShaderData shaderData = {0};
   vec3 camPos = {0.0f, 0.0f, -6.0f};
+  vec3 camFront = {0.0f, 0.0f, 1.0f}; // Looking towards +Z
+vec3 camUp = {0.0f, 1.0f, 0.0f};
+float yaw = 0.0f;
+float pitch = 0.0f;
   vec3 objectRotations[3] = {0};
+  int i = 0;
   while (!quit) {
+
+float elapsedTime = {(SDL_GetTicks() - lastTime) / 1000.0f};
+    lastTime = SDL_GetTicks();
+    float fps = 1/elapsedTime;
+    i+=(int)(elapsedTime * 1000);
+    if(i == 60*1000) {
+      printf("fps: %f\n", fps);
+      i = 0;
+    }
+
+    // WASD Camera Movement
+const bool *state = SDL_GetKeyboardState(NULL);
+float cameraSpeed = 5.0f * elapsedTime;
+
+// Calculate the right vector (Up x Front)
+vec3 camRight;
+camRight[0] = camUp[1] * camFront[2] - camUp[2] * camFront[1];
+camRight[1] = camUp[2] * camFront[0] - camUp[0] * camFront[2];
+camRight[2] = camUp[0] * camFront[1] - camUp[1] * camFront[0];
+glm_normalize(camRight);
+
+if (state[SDL_SCANCODE_W]) {
+    camPos[0] += camFront[0] * cameraSpeed;
+    // camPos[1] += camFront[1] * cameraSpeed; // not here because space/shift
+    camPos[2] += camFront[2] * cameraSpeed;
+}
+if (state[SDL_SCANCODE_S]) {
+    camPos[0] -= camFront[0] * cameraSpeed;
+    // camPos[1] -= camFront[1] * cameraSpeed;
+    camPos[2] -= camFront[2] * cameraSpeed;
+}
+if (state[SDL_SCANCODE_A]) {
+    camPos[0] += camRight[0] * cameraSpeed;
+    // camPos[1] -= camRight[1] * cameraSpeed;
+    camPos[2] += camRight[2] * cameraSpeed;
+}
+if (state[SDL_SCANCODE_D]) {
+    camPos[0] -= camRight[0] * cameraSpeed;
+    // camPos[1] += camRight[1] * cameraSpeed;
+    camPos[2] -= camRight[2] * cameraSpeed;
+}
+if (state[SDL_SCANCODE_SPACE]) {
+    camPos[1] -= cameraSpeed;
+}
+if(state[SDL_SCANCODE_RSHIFT] || state[SDL_SCANCODE_LSHIFT]) {
+    camPos[1] += cameraSpeed;
+}
 
   // redo windowsize per frame
   SDL_GetWindowSizeInPixels(window, &sc.windowSize[0], &sc.windowSize[1]);
@@ -951,9 +1037,12 @@ if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_
     // Update shader data
     glm_perspective(glm_rad(45.0f), (float)sc.windowSize[0] / (float)sc.windowSize[1],
                     0.1f, 32.0f, shaderData.projection);
-    glm_translate_make(shaderData.view, camPos);
+    // Replace: glm_translate_make(shaderData.view, camPos);
+vec3 camTarget;
+glm_vec3_add(camPos, camFront, camTarget);
+glm_lookat(camPos, camTarget, camUp, shaderData.view);
     for (int i = 0; i < 3; i++) {
-      vec3 instancePos = {(float)(i - 1) * 3.0f, 0.0f, 0.0f};
+      vec3 instancePos = {(float)0.0f, 0.0f, 0.0f};
       mat4 translationMat, rotationMat;
       glm_translate_make(translationMat, instancePos);
       glm_euler_xyz(objectRotations[i], rotationMat);
@@ -963,7 +1052,7 @@ if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_
            &shaderData, sizeof(ShaderData));
     // Record command buffer
     VkCommandBuffer cb = commandBuffers[frameIndex];
-    chk(vkResetCommandBuffer(cb, 0));
+    chkvk(vkResetCommandBuffer(cb, 0));
 
     VkCommandBufferBeginInfo cbBI = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -1026,6 +1115,26 @@ if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_
     vkCmdBeginRendering(cb, &renderingInfo);
 
     vkCmdBindPipeline(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+    // viewport/scissor are dynamic state on this pipeline -- must be set every
+    // time this command buffer is (re-)recorded, or the driver rasterizes
+    // against an undefined/zero-sized viewport and nothing shows up on screen.
+    VkViewport viewport = {
+        .x = 0.0f,
+        .y = 0.0f,
+        .width = (float)sc.windowSize[0],
+        .height = (float)sc.windowSize[1],
+        .minDepth = 0.0f,
+        .maxDepth = 1.0f,
+    };
+    vkCmdSetViewport(cb, 0, 1, &viewport);
+
+    VkRect2D scissor = {
+        .offset = {0, 0},
+        .extent = {(uint32_t)sc.windowSize[0], (uint32_t)sc.windowSize[1]},
+    };
+    vkCmdSetScissor(cb, 0, 1, &scissor);
+
     VkDeviceSize vOffset = {0};
     vkCmdBindDescriptorSets(cb, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout,
                             0, 1, &descriptorSetTex, 0, NULL);
@@ -1035,7 +1144,7 @@ if (acquireResult == VK_ERROR_OUT_OF_DATE_KHR || acquireResult == VK_SUBOPTIMAL_
                        sizeof(VkDeviceAddress),
                        &shaderDataBuffers[frameIndex].deviceAddress);
 
-    vkCmdDrawIndexed(cb, indexCount, 3, 0, 0, 0); // drawing, finally
+    vkCmdDrawIndexed(cb, indexCount, 1, 0, 0, 0); // drawing, finally
     vkCmdEndRendering(cb);
 
     VkImageMemoryBarrier2 barrierPresent = {
@@ -1098,8 +1207,7 @@ if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_
 
     // Poll events
 
-    float elapsedTime = {(SDL_GetTicks() - lastTime) / 1000.0f};
-    lastTime = SDL_GetTicks();
+    
     for (SDL_Event event; SDL_PollEvent(&event);) {
 
       // Exit loop if the application is about to close
@@ -1108,20 +1216,30 @@ if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_
         break;
       }
 
-      // Rotate the selected object with mouse drag
-      if (event.type == SDL_EVENT_MOUSE_MOTION) {
-        if (event.button.button == SDL_BUTTON_LEFT) {
-          objectRotations[shaderData.selected][0] -=
-              (float)event.motion.yrel * elapsedTime;
-          objectRotations[shaderData.selected][1] +=
-              (float)event.motion.xrel * elapsedTime;
-        }
+      // Rotate the selected object / Look around with mouse
+      // Camera look, unconditional now that the cursor is locked to the window
+      if (event.type == SDL_EVENT_MOUSE_MOTION && mouseCaptured) {
+        yaw -= event.motion.xrel * 0.003f;
+        pitch += event.motion.yrel * 0.003f; // Invert Y axis
+
+        // Constrain pitch to avoid camera flipping upside down
+        if (pitch > 1.55f) pitch = 1.55f;
+        if (pitch < -1.55f) pitch = -1.55f;
+
+        // Recalculate camFront based on spherical coordinates
+        camFront[0] = sinf(yaw);
+        camFront[1] = sinf(pitch);
+        camFront[2] = cosf(yaw);
+        glm_normalize(camFront);
       }
 
-      // Zooming with the mouse wheel
-      if (event.type == SDL_EVENT_MOUSE_WHEEL) {
-        camPos[2] += (float)event.wheel.y * elapsedTime * 10.0f;
-      }
+// Zooming with the mouse wheel (now moves along the camera's forward vector)
+if (event.type == SDL_EVENT_MOUSE_WHEEL) {
+    float zoomSpeed = 10.0f;
+    camPos[0] += camFront[0] * (float)event.wheel.y * zoomSpeed;
+    camPos[1] += camFront[1] * (float)event.wheel.y * zoomSpeed;
+    camPos[2] += camFront[2] * (float)event.wheel.y * zoomSpeed;
+}
 
       // Select active model instance
       if (event.type == SDL_EVENT_KEY_DOWN) {
@@ -1133,6 +1251,17 @@ if (presentResult == VK_ERROR_OUT_OF_DATE_KHR || presentResult == VK_SUBOPTIMAL_
           shaderData.selected =
               (shaderData.selected > 0) ? shaderData.selected - 1 : 2;
         }
+        // Esc frees the cursor -- lets you reach other windows/menus
+        if (event.key.key == SDLK_ESCAPE && mouseCaptured) {
+          chk(SDL_SetWindowRelativeMouseMode(window, false));
+          mouseCaptured = false;
+        }
+      }
+
+      // Click back inside the window to recapture the cursor
+      if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !mouseCaptured) {
+        chk(SDL_SetWindowRelativeMouseMode(window, true));
+        mouseCaptured = true;
       }
 
       // Window resize
