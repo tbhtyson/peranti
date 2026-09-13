@@ -349,36 +349,82 @@ int peranti_init(int argc, char *argv[]) {
   // loading meshes
   //
   // --- past base cube: mesh from Phase 1/2's World + binary greedy mesher
-  // instead of a hardcoded cube. Deliberately the simplest possible test
-  // scene (one solid uniform mapblock, no neighbors loaded) rather than
-  // something that exercises multi-chunk face culling: this is dimensionally
-  // and topologically identical to the cube it replaces (verified: 24
-  // vertices, 36 indices, same as the array below used to be), so it's the
-  // lowest-risk way to confirm the whole World -> mesh_build ->
-  // mesh_to_legacy_buffers -> GPU pipeline is wired correctly before adding
-  // any new variables (multi-chunk placement/offsets) on top of it.
+  // --- past base cube: two adjacent solid mapblocks instead of one, to
+  // actually exercise (visually, not just via mesh.c's unit tests) the
+  // mesher's own neighbor-pulling face culling: the shared face between
+  // {0,0,0} and {1,0,0} should be invisible, and the two blocks should
+  // read as one seamless 32x16x16 box with no crack at the boundary. If
+  // there's a visible seam or a doubled-up face at the join, that's
+  // occupancy_build's neighbor logic failing in a way the unit tests
+  // (which only ever checked bitmask values, never actual rendered
+  // geometry) didn't catch.
+  //
+  // IMPORTANT ordering: both mapblocks are inserted into testWorld before
+  // either one is meshed. Meshing block A before block B exists would
+  // incorrectly leave block A's +X face exposed (its neighbor wasn't
+  // there yet when occupancy_build looked for it), even though block B's
+  // own mesh (built afterward) would correctly cull its -X face -- an
+  // asymmetric bug that's easy to introduce by interleaving insert/build
+  // per block instead of inserting everything up front.
   World testWorld;
   world_init(&testWorld, 8);
   Node testStone = {.content_id = 3, .param1 = 0, .param2 = 0};
-  world_insert(&testWorld, (ChunkCoord){0, 0, 0}, mapblock_make_uniform(testStone));
+  ChunkCoord coordA = {0, 0, 0};
+  ChunkCoord coordB = {1, 0, 0};
+  world_insert(&testWorld, coordA, mapblock_make_uniform(testStone));
+  world_insert(&testWorld, coordB, mapblock_make_uniform(testStone));
 
-  Mesh testMesh;
-  mesh_init(&testMesh);
-  mesh_build(&testWorld, (ChunkCoord){0, 0, 0}, &testMesh);
+  Mesh meshA, meshB;
+  mesh_init(&meshA);
+  mesh_init(&meshB);
+  mesh_build(&testWorld, coordA, &meshA);
+  mesh_build(&testWorld, coordB, &meshB);
+  // Expected: 5 quads each (20 vertices, 30 indices each), not 6/24/36 --
+  // each block's face toward the other got culled. 6/24/36 each here
+  // would mean the shared-face culling isn't actually happening.
 
-  Vertex *vertices;
-  uint32_t vertexCount;
-  uint16_t *indices;
-  uint32_t indexCountU32;
-  mesh_to_legacy_buffers(&testMesh, &vertices, &vertexCount, &indices,
-                          &indexCountU32);
+  Vertex *vertsA, *vertsB;
+  uint32_t vertexCountA, vertexCountB;
+  uint16_t *idxA, *idxB;
+  uint32_t indexCountA, indexCountB;
+  mesh_to_legacy_buffers(&meshA, &vertsA, &vertexCountA, &idxA, &indexCountA);
+  mesh_to_legacy_buffers(&meshB, &vertsB, &vertexCountB, &idxB, &indexCountB);
 
-  // World/Mesh are only scaffolding to produce `vertices`/`indices` above;
-  // mesh_to_legacy_buffers already made its own independent malloc'd
-  // copies, so both can be torn down immediately rather than kept alive
-  // for the rest of init().
-  mesh_destroy(&testMesh);
+  mesh_destroy(&meshA);
+  mesh_destroy(&meshB);
   world_destroy(&testWorld);
+
+  // mesh_to_legacy_buffers has no idea what ChunkCoord it built for -- it
+  // only ever sees local 0..15 node coordinates (see mesh_legacy.h).
+  // Placing block B next to block A in world space, rather than directly
+  // on top of it, is this test scene's job: offset every one of block B's
+  // vertices by +16 along X, matching coordB being {1,0,0}.
+  for (uint32_t i = 0; i < vertexCountB; i++) {
+    vertsB[i].pos[0] += 16.0f;
+  }
+
+  uint32_t vertexCount = vertexCountA + vertexCountB;
+  uint32_t indexCountU32 = indexCountA + indexCountB;
+  Vertex *vertices = malloc(sizeof(Vertex) * vertexCount);
+  uint16_t *indices = malloc(sizeof(uint16_t) * indexCountU32);
+  if (!vertices || !indices) {
+    fprintf(stderr, "peranti_init: out of memory combining test mapblocks\n");
+    exit(1);
+  }
+  memcpy(vertices, vertsA, sizeof(Vertex) * vertexCountA);
+  memcpy(vertices + vertexCountA, vertsB, sizeof(Vertex) * vertexCountB);
+  memcpy(indices, idxA, sizeof(uint16_t) * indexCountA);
+  // Block B's indices point into vertsB, which is now appended after
+  // vertsA in the combined array -- every one needs to shift by
+  // vertexCountA to still point at the right (now-relocated) vertex.
+  for (uint32_t i = 0; i < indexCountB; i++) {
+    indices[indexCountA + i] = (uint16_t)(idxB[i] + vertexCountA);
+  }
+
+  free(vertsA);
+  free(vertsB);
+  free(idxA);
+  free(idxB);
 
   const VkDeviceSize indexCount = {indexCountU32};
 
@@ -425,7 +471,7 @@ int peranti_init(int argc, char *argv[]) {
   memcpy(((char *)vBufferAllocInfo.pMappedData) + vBufSize, indices, iBufSize);
 
   // Already copied into the GPU-visible mapped buffer above; the CPU-side
-  // copies mesh_to_legacy_buffers malloc'd are done being useful.
+  // copies are done being useful.
   free(vertices);
   free(indices);
 
