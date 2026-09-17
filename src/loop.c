@@ -1,10 +1,85 @@
 #include "app.h"
+#include "net_serialize.h"
 #include <math.h>
+
+// Real clients only call sendReady() from afterContentReceived(), gated on
+// having received AND locally processed item defs, node defs, and media --
+// a milestone we don't track yet (we're not even decoding those payloads,
+// just logging their length in onGameplayPacket). This sends it as soon as
+// the connection reaches NET_CONN_INGAME instead, purely to find out
+// whether the server gates block-streaming on CLIENT_READY at all -- it's
+// not real client behavior, and should be replaced with the real
+// content-received gate once item/node-def decoding exists.
+#define TOSERVER_CLIENT_READY 0x43u
+
+static void sendClientReadyPacket(void) {
+  uint8_t body[1 + 1 + 1 + 1 + 2 + 32 + 2];
+  NetWriter w;
+  net_writer_init(&w, body, sizeof(body));
+
+  // Not a real Luanti build -- claiming Luanti 5.18.0's version numbers
+  // since that's the protocol version this recreation targets (see
+  // net_types.h's NET_LATEST_PROTOCOL_VERSION), but with an honest,
+  // identifying version-hash string rather than pretending to be a real
+  // upstream build.
+  net_put_u8(&w, 5);
+  net_put_u8(&w, 18);
+  net_put_u8(&w, 0);
+  net_put_u8(&w, 0); // reserved
+  const char *versionHash = "peranti-net-recreation";
+  net_put_u16(&w, (uint16_t)strlen(versionHash));
+  net_put_bytes(&w, versionHash, strlen(versionHash));
+  net_put_u16(&w, 11); // FORMSPEC_API_VERSION, upstream's current value
+
+  net_send_gameplay(net, TOSERVER_CLIENT_READY, body, w.pos, /*channel=*/1, /*reliable=*/true);
+  printf("[net] sent TOSERVER_CLIENT_READY\n");
+}
+
+// TOSERVER_PLAYERPOS: channel 0, unreliable (clientopcodes.cpp) -- makes
+// sense for latest-value-wins traffic like position, no need to ack/resend
+// a stale one once a newer update supersedes it.
+//
+// Confirmed against the real sender (writePlayerPos() in client.cpp, not
+// just the enum comment -- see onGameplayPacket()'s note on why that
+// comment can't be trusted alone): position/speed are v3s32*100, pitch/yaw
+// are s32*100. This genuinely is integer-scaled, unlike TOCLIENT_MOVE_PLAYER
+// which turned out to be plain floats despite its similar-looking comment.
+// playerNetState.x/y/z are already real (unscaled) floats -- populated
+// from MOVE_PLAYER's plain-float fields -- so this function is the only
+// place that needs to apply the *100 encoding this packet actually uses.
+#define TOSERVER_PLAYERPOS 0x23u
+
+static void sendPlayerPosPacket(void) {
+  uint8_t body[3 * 4 + 3 * 4 + 4 + 4 + 4 + 1 + 1 + 1 + 4 + 4];
+  NetWriter w;
+  net_writer_init(&w, body, sizeof(body));
+
+  net_put_s32(&w, (int32_t)(playerNetState.x * 100.0f));
+  net_put_s32(&w, (int32_t)(playerNetState.y * 100.0f));
+  net_put_s32(&w, (int32_t)(playerNetState.z * 100.0f));
+  net_put_s32(&w, 0); // speed.x -- no local movement/physics yet, we're stationary
+  net_put_s32(&w, 0); // speed.y
+  net_put_s32(&w, 0); // speed.z
+  net_put_s32(&w, (int32_t)(playerNetState.pitch * 100.0f));
+  net_put_s32(&w, (int32_t)(playerNetState.yaw * 100.0f));
+  net_put_u32(&w, 0); // keyPressed -- no input state wired to networking yet
+  net_put_u8(&w, 100); // fov -- placeholder; real value is radians*80 from camera settings
+                       // that don't exist yet (see movement_speed/direction below)
+  net_put_u8(&w, 4);   // wanted_range in mapblocks -- placeholder for testing, not
+                       // derived from any real view-distance setting yet
+  net_put_u8(&w, 0);   // camera_inverted
+  net_put_f32(&w, 0.0f); // movement_speed
+  net_put_f32(&w, 0.0f); // movement_direction
+
+  net_send_gameplay(net, TOSERVER_PLAYERPOS, body, w.pos, /*channel=*/0, /*reliable=*/false);
+}
 
 int peranti_mainloop(void) {
   uint64_t lastTime = {SDL_GetTicks()};
   bool quit = {false};
   bool mouseCaptured = {true}; // matches the initial SDL_SetWindowRelativeMouseMode(window, true) above
+  bool sentClientReady = {false};
+  float playerPosSendTimer = {0.0f};
   uint32_t frameIndex = {0};
   uint32_t imageIndex = {0};
   ShaderData shaderData = {0};
@@ -24,6 +99,24 @@ float elapsedTime = {(SDL_GetTicks() - lastTime) / 1000.0f};
     if(i == 60*1000) {
       printf("fps: %f\n", fps);
       i = 0;
+    }
+
+    // --- past base cube: networking
+    net_poll(net, elapsedTime);
+    if (!sentClientReady && net_get_state(net) == NET_CONN_INGAME) {
+      sendClientReadyPacket();
+      sentClientReady = true;
+    }
+    // Only start once we actually know a position (from TOCLIENT_MOVE_PLAYER)
+    // -- sending PLAYERPOS before that would report a meaningless (0,0,0),
+    // reintroducing the exact "server doesn't know where we are" problem
+    // this is meant to fix, just with a wrong answer instead of no answer.
+    if (net_get_state(net) == NET_CONN_INGAME && playerNetState.haveSpawnPosition) {
+      playerPosSendTimer += elapsedTime;
+      if (playerPosSendTimer >= net_get_recommended_send_interval(net)) {
+        playerPosSendTimer = 0.0f;
+        sendPlayerPosPacket();
+      }
     }
 
     // WASD Camera Movement
@@ -348,7 +441,12 @@ if (event.type == SDL_EVENT_MOUSE_WHEEL) {
       updateSwapchain = false;
       recreateSwapchain();
     }
+    /*int framesSinceLastRebuild = 0;
+    framesSinceLastRebuild++;
+    if(framesSinceLastRebuild > 60) {
+      framesSinceLastRebuild = 0;
+      mesh_build();
+    } */
   }
-
   return 0;
 }

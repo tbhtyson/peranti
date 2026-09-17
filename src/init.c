@@ -2,10 +2,83 @@
 #include "mesh.h"
 #include "mesh_legacy.h"
 #include "world.h"
+#include "net_serialize.h"
+#include "mapblock_decode.h"
 #include <SDL3/SDL_scancode.h>
 #include <assert.h>
 #include <math.h>
 #include <string.h>
+
+// --- past base cube: networking
+
+// Only the opcodes this dispatch actually branches on live here, not the
+// full ToClientCommand enum -- net_types.h deliberately keeps that enum
+// limited to what net.c's handshake state machine needs (see its own
+// comment on that). Sourced against networkprotocol.h upstream, same as
+// everything else in the net_* module.
+#define TOCLIENT_BLOCKDATA 0x20u
+#define TOCLIENT_MOVE_PLAYER 0x34u
+
+static void onGameplayPacket(uint16_t opcode, const uint8_t *payload, size_t len, void *userData) {
+  (void)userData;
+
+  if (opcode == TOCLIENT_MOVE_PLAYER) {
+    // The networkprotocol.h enum comment for this opcode is stale: it
+    // labels these fields "v3f1000 position, f1000 pitch, f1000 yaw" (an
+    // integer*1000 fixed-point encoding), but the real handler
+    // (Client::handleCommand_MovePlayer in clientpackethandler.cpp) does
+    // `*pkt >> pos >> pitch >> yaw` where pos/pitch/yaw are v3f/f32 --
+    // which NetworkPacket's actual operator>> implements via readV3F32/
+    // readF32 (util/serialize.h), i.e. plain native 32-bit IEEE-754
+    // floats. readF1000/readV3F1000 are separate, unused-here functions
+    // for a different, older fixed-point encoding. Trusting the comment
+    // instead of the handler produced values in the hundreds of
+    // thousands here (raw bits misread as a scaled integer) -- this is
+    // net_get_f32() (bit-reinterpret), not net_get_s32()/1000.0f.
+    NetReader r;
+    net_reader_init(&r, payload, len);
+    playerNetState.x = net_get_f32(&r);
+    playerNetState.y = net_get_f32(&r);
+    playerNetState.z = net_get_f32(&r);
+    playerNetState.pitch = net_get_f32(&r);
+    playerNetState.yaw = net_get_f32(&r);
+    playerNetState.haveSpawnPosition = true;
+    printf("[net] TOCLIENT_MOVE_PLAYER: pos=(%.2f, %.2f, %.2f) pitch=%.2f yaw=%.2f\n",
+           playerNetState.x, playerNetState.y, playerNetState.z,
+           playerNetState.pitch, playerNetState.yaw);
+    return;
+  }
+
+  if (opcode == TOCLIENT_BLOCKDATA) {
+    // See mapblock_decode.h for exactly which wire format this is (the
+    // NETWORK one, disk=false -- genuinely different from the map.sqlite
+    // format: no leading version byte, no per-block NameIdMapping, etc).
+    // net_get_server_ser_ver() is required here, not assumed/hardcoded --
+    // it's the one piece of session state (from TOCLIENT_HELLO) this
+    // format depends on instead of carrying its own version byte.
+    ChunkCoord coord;
+    Mapblock block;
+    mapblock_decode_network(payload, len, net_get_server_ser_ver(net), &coord, &block);
+
+    // world_insert() either succeeds (taking ownership of block's
+    // heap-allocated nodes -- see world.c) or exit(1)s on a full table;
+    // it never returns false in the current implementation, so there's
+    // no "insert failed, free our local copy" path to handle here.
+    world_insert(&world, coord, block);
+
+    // Actually triggering a re-mesh for this chunk (and its neighbors,
+    // since mesh.c's greedy mesher culls faces against them) is Phase 2
+    // territory -- camera-driven streaming doesn't exist yet, and there's
+    // no dirty-chunk queue to feed even if it did. Not stubbing a
+    // half-built version of that here; this just proves real terrain is
+    // landing in the persistent World.
+    printf("[net] TOCLIENT_BLOCKDATA: decoded block (%d, %d, %d) -- %u blocks loaded\n",
+           coord.x, coord.y, coord.z, world.count);
+    return;
+  }
+
+  printf("[net] gameplay packet opcode=0x%02x len=%zu\n", opcode, len);
+}
 
 static VkBool32 VKAPI_CALL debugCallback(
     VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -916,6 +989,26 @@ int peranti_init(int argc, char *argv[]) {
   app.descriptorSetTex = descriptorSetTex;
   app.pipelineLayout = pipelineLayout;
   app.pipeline = pipeline;
+
+  // --- past base cube: World, persistent (not the local testWorld scratch
+  // scene above, which is a throwaway mesh-culling unit test). Capacity is
+  // a placeholder, not a considered number: Phase 2 (camera-driven chunk
+  // streaming / real view distance) is what should actually determine
+  // this, and that hasn't been built yet. 4096 slots is roughly enough
+  // mapblocks for a modest view distance with headroom before the
+  // open-addressing table's load factor gets uncomfortable -- revisit the
+  // instant Phase 2 exists to give a real number instead of this guess.
+  #define WORLD_CAPACITY_PLACEHOLDER 4096
+  world_init(&world, WORLD_CAPACITY_PLACEHOLDER);
+
+  // --- past base cube: networking. Host/playername/password are hardcoded
+  // for now -- no CLI parsing convention exists yet beyond argv[1]'s device
+  // index (see top of this function), and this is Phase 6 work landing
+  // ahead of Phase 1-5, so it isn't worth inventing config-file/CLI-arg
+  // plumbing for yet. Revisit once there's an actual reason to connect to
+  // more than one server.
+  net = net_create("udp.tbhtyson.com", 30000, "tbhtysonPks", "tice");
+  net_set_gameplay_handler(net, onGameplayPacket, NULL);
 
   return 0;
 }

@@ -11,6 +11,8 @@
 #include "types.h"
 #include "vk_mem_alloc.h"
 #include "volk/volk.h"
+#include "net.h"
+#include "world.h"
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
 #include <stdbool.h>
@@ -129,6 +131,39 @@ extern AppState app;
 
 // --- past base cube: add new cross-phase state above this line, in its own
 // struct, not by growing AppState indefinitely.
+
+// Net owns its own lifecycle (net_create/net_poll/net_destroy) and knows
+// nothing about AppState -- this is just the single shared handle, same
+// ownership pattern as `sc`/`app` above: declared here, defined once in
+// app.c, written by init.c, read/driven by loop.c every frame.
+extern Net *net;
+
+// World's definition is fully exposed in world.h (unlike Net, which is
+// deliberately opaque), so this is a plain struct like `sc`/`app` above,
+// not a pointer. Still needs an explicit world_init()/world_destroy() pair
+// though -- it holds a heap-allocated slot array, zero-initializing this
+// struct isn't enough to make it usable. init.c calls world_init() during
+// peranti_init(); app.c's peranti_shutdown() calls world_destroy().
+//
+// This is where net's TOCLIENT_BLOCKDATA handling lands real map data --
+// see onGameplayPacket() in init.c. It has nothing to do with init.c's
+// local `testWorld` scratch scene, which is a self-contained mesh-culling
+// unit test that builds and destroys its own throwaway World.
+extern World world;
+
+// Populated by init.c's onGameplayPacket() when TOCLIENT_MOVE_PLAYER
+// arrives (the server telling us our spawn position) and read by loop.c's
+// sendPlayerPosPacket() to echo it back via TOSERVER_PLAYERPOS -- without
+// that, the server has no idea where to stream blocks from. Not a real
+// player/physics state (no velocity tracking, no local movement yet),
+// just enough to answer "where are you" honestly using what the server
+// itself told us, rather than guessing a fixed point like (0,0,0).
+typedef struct {
+  bool haveSpawnPosition;
+  float x, y, z;   // node-space coordinates, as reported by MOVE_PLAYER
+  float pitch, yaw;
+} PlayerNetState;
+extern PlayerNetState playerNetState;
 
 int peranti_init(int argc, char *argv[]);
 int peranti_mainloop(void);

@@ -7,7 +7,9 @@ BUILD    := build
 TARGET   := $(BUILD)/vulkanapp
 
 # All real project logic stays plain C. Vendored third-party C sources (e.g. volk) go here too.
-C_SRC    := src/main.c src/app.c src/init.c src/loop.c src/chunk.c src/world.c src/mesh.c src/mesh_legacy.c src/third_party/volk/volk.c
+C_SRC    := src/main.c src/app.c src/init.c src/loop.c src/chunk.c src/world.c src/mesh.c src/mesh_legacy.c src/third_party/volk/volk.c \
+            src/net.c src/net_channel.c src/net_socket.c src/net_srp.c src/sha256.c \
+            src/mapblock_decode.c
 # The ONLY C++ in the project: a one-liner that instantiates VMA's implementation.
 CXX_SRC  := src/vma_impl.cpp
 
@@ -36,7 +38,7 @@ $(SHADER_BUILD_DIR)/%.frag.spv.inc: $(SHADER_SRC_DIR)/%.frag
 	glslc -mfmt=c $< -o $@
 
 # Anything with a .pc file goes through pkg-config
-PKGS       := sdl3 vulkan
+PKGS       := sdl3 vulkan gmp libzstd
 PKG_CFLAGS := $(shell pkg-config --cflags $(PKGS))
 PKG_LIBS   := $(shell pkg-config --libs $(PKGS))
 
