@@ -122,6 +122,14 @@ typedef struct {
   VkBuffer vBuffer;
   VkDeviceSize vBufSize;
   VkDeviceSize indexCount;
+  // The allocation handle for vBuffer above. The original single-shot
+  // init.c buffer never needed this stored anywhere -- it was written
+  // once and never rebuilt, so peranti_shutdown()'s "leak everything, the
+  // OS reclaims it" policy covered it fine. world_render_rebuild() (see
+  // world_render.h) needs it explicitly: rebuilding vBuffer as loaded
+  // chunks change means destroying the OLD allocation first, or every
+  // rebuild leaks VRAM instead of just reusing/replacing it.
+  VmaAllocation vBufferAllocation;
   VkDescriptorSet descriptorSetTex;
   VkPipelineLayout pipelineLayout;
   VkPipeline pipeline;
@@ -162,11 +170,30 @@ typedef struct {
   bool haveSpawnPosition;
   float x, y, z;   // node-space coordinates, as reported by MOVE_PLAYER
   float pitch, yaw;
+  // Bumped every time onGameplayPacket() processes a fresh
+  // TOCLIENT_MOVE_PLAYER, not just the first one. The server keeps
+  // sending corrections after spawn (gravity, since we report zero
+  // velocity and there's no physics simulation yet; general position
+  // validation) -- a one-shot camera sync leaves the camera frozen at
+  // the original spawn point while streamed terrain follows the
+  // server's actual, drifting authoritative position, which is exactly
+  // what "camera ends up farther and farther from the world over time"
+  // looks like. loop.c compares this against its own
+  // lastSyncedSpawnGeneration to know when a fresh correction has
+  // arrived worth re-syncing to.
+  uint32_t spawnGeneration;
 } PlayerNetState;
 extern PlayerNetState playerNetState;
 
 int peranti_init(int argc, char *argv[]);
 int peranti_mainloop(void);
 int peranti_shutdown(void);
+
+// Defined in init.c alongside onGameplayPacket() (which accumulates into
+// the pending buffer this flushes) -- called once per frame from loop.c,
+// right after net_poll(), so a whole frame's worth of newly-arrived
+// blocks becomes one GOTBLOCKS packet instead of one per block. See its
+// own comment in init.c for why this exists.
+void flushPendingGotBlocks(void);
 
 #endif

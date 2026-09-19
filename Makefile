@@ -9,7 +9,7 @@ TARGET   := $(BUILD)/vulkanapp
 # All real project logic stays plain C. Vendored third-party C sources (e.g. volk) go here too.
 C_SRC    := src/main.c src/app.c src/init.c src/loop.c src/chunk.c src/world.c src/mesh.c src/mesh_legacy.c src/third_party/volk/volk.c \
             src/net.c src/net_channel.c src/net_socket.c src/net_srp.c src/sha256.c \
-            src/mapblock_decode.c
+            src/mapblock_decode.c src/world_render.c
 # The ONLY C++ in the project: a one-liner that instantiates VMA's implementation.
 CXX_SRC  := src/vma_impl.cpp
 

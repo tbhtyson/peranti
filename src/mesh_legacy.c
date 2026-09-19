@@ -22,7 +22,7 @@
 // the opposite corner-ordering rule from X and Z below.
 static bool axis_is_handedness_reversing(int axis) { return axis == 1; }
 
-static void emit_quad(const Quad *q, Vertex *verts, uint16_t *indices,
+static void emit_quad(const Quad *q, Vertex *verts, uint32_t *indices,
                        uint32_t vertex_base, uint32_t index_base) {
   float lowA, highA, lowB, highB, main_coord;
   float normal[3] = {0.0f, 0.0f, 0.0f};
@@ -103,31 +103,41 @@ static void emit_quad(const Quad *q, Vertex *verts, uint16_t *indices,
     v->uv[1] = uvs[i][1];
   }
 
-  static const uint16_t tri[6] = {0, 1, 2, 2, 3, 0};
+  static const uint32_t tri[6] = {0, 1, 2, 2, 3, 0};
   for (int i = 0; i < 6; i++) {
-    indices[index_base + (uint32_t)i] = (uint16_t)(vertex_base + tri[i]);
+    indices[index_base + (uint32_t)i] = vertex_base + tri[i];
   }
 }
 
 void mesh_to_legacy_buffers(const Mesh *mesh, Vertex **out_vertices,
                              uint32_t *out_vertex_count,
-                             uint16_t **out_indices,
+                             uint32_t **out_indices,
                              uint32_t *out_index_count) {
+  // 32-bit indices (VK_INDEX_TYPE_UINT32), not 16 -- Vulkan supports this
+  // natively, it was never a hard platform limit. The old 16-bit choice
+  // was this bridge's own implementation detail, and it's exactly what
+  // broke at real chunk-streaming scale: 88 loaded chunks alone produced
+  // 65300 combined vertices, right at the UINT16_MAX=65535 wall. A single
+  // mapblock's absolute worst case (4096 nodes, zero greedy-merging) is
+  // ~98304 vertices -- already past UINT16_MAX on its own -- so even the
+  // OLD per-chunk check here was already close to binding; 32-bit
+  // indices make both this and world_render.c's combined-buffer check
+  // non-issues for any realistic future.
   uint64_t vertex_count64 = (uint64_t)mesh->count * 4;
-  if (vertex_count64 > UINT16_MAX) {
+  if (vertex_count64 > UINT32_MAX) {
     fprintf(stderr,
             "mesh_to_legacy_buffers: %u quads need %llu vertices, over the "
-            "uint16 index limit (%u) -- this bridge only supports small "
-            "synthetic test scenes, not real chunk-streaming scale\n",
+            "uint32 index limit (%u) -- something is very wrong with this "
+            "mesh, this isn't a realistic single-mapblock count\n",
             mesh->count, (unsigned long long)vertex_count64,
-            (unsigned)UINT16_MAX);
+            (unsigned)UINT32_MAX);
     exit(1);
   }
   uint32_t vertex_count = (uint32_t)vertex_count64;
   uint32_t index_count = mesh->count * 6;
 
   Vertex *verts = malloc(sizeof(Vertex) * vertex_count);
-  uint16_t *indices = malloc(sizeof(uint16_t) * index_count);
+  uint32_t *indices = malloc(sizeof(uint32_t) * index_count);
   if ((!verts && vertex_count > 0) || (!indices && index_count > 0)) {
     fprintf(stderr, "mesh_to_legacy_buffers: out of memory\n");
     exit(1);

@@ -18,6 +18,42 @@
 // everything else in the net_* module.
 #define TOCLIENT_BLOCKDATA 0x20u
 #define TOCLIENT_MOVE_PLAYER 0x34u
+#define TOSERVER_GOTBLOCKS 0x24u
+
+// Batches GOTBLOCKS acks instead of sending one reliable packet per block.
+// The wire format already supports this (u8 count, then that many v3s16
+// positions) -- real clients do exactly this. Sending one-per-block was
+// the simplest correct first fix, but it's what caused "net_channel:
+// outgoing reliable window full": once blocks actually started flowing
+// (after GOTBLOCKS existed at all), a fast burst fired more reliable
+// packets on channel 2 than the server could ack before the 64-slot
+// window filled. Flushed once per frame from loop.c (see
+// flushPendingGotBlocks()), so a whole frame's worth of arrivals becomes
+// ONE packet instead of one each. 64 capacity comfortably exceeds the
+// server's own concurrent in-flight cap (m_max_simul_sends, default 40 --
+// it can never have more than that many blocks awaiting ack from us at
+// once, so we can never legitimately need to batch more than that
+// between flushes), with headroom; flushes early if it somehow fills
+// before the next per-frame flush point rather than overflow silently.
+#define PENDING_GOTBLOCKS_CAP 64u
+static ChunkCoord pendingGotBlocks[PENDING_GOTBLOCKS_CAP];
+static uint32_t pendingGotBlocksCount = 0;
+
+void flushPendingGotBlocks(void) {
+  if (pendingGotBlocksCount == 0)
+    return;
+  uint8_t body[1 + PENDING_GOTBLOCKS_CAP * 6];
+  NetWriter w;
+  net_writer_init(&w, body, sizeof(body));
+  net_put_u8(&w, (uint8_t)pendingGotBlocksCount);
+  for (uint32_t i = 0; i < pendingGotBlocksCount; i++) {
+    net_put_s16(&w, (int16_t)pendingGotBlocks[i].x);
+    net_put_s16(&w, (int16_t)pendingGotBlocks[i].y);
+    net_put_s16(&w, (int16_t)pendingGotBlocks[i].z);
+  }
+  net_send_gameplay(net, TOSERVER_GOTBLOCKS, body, w.pos, /*channel=*/2, /*reliable=*/true);
+  pendingGotBlocksCount = 0;
+}
 
 static void onGameplayPacket(uint16_t opcode, const uint8_t *payload, size_t len, void *userData) {
   (void)userData;
@@ -43,6 +79,7 @@ static void onGameplayPacket(uint16_t opcode, const uint8_t *payload, size_t len
     playerNetState.pitch = net_get_f32(&r);
     playerNetState.yaw = net_get_f32(&r);
     playerNetState.haveSpawnPosition = true;
+    playerNetState.spawnGeneration++;
     printf("[net] TOCLIENT_MOVE_PLAYER: pos=(%.2f, %.2f, %.2f) pitch=%.2f yaw=%.2f\n",
            playerNetState.x, playerNetState.y, playerNetState.z,
            playerNetState.pitch, playerNetState.yaw);
@@ -65,6 +102,21 @@ static void onGameplayPacket(uint16_t opcode, const uint8_t *payload, size_t len
     // it never returns false in the current implementation, so there's
     // no "insert failed, free our local copy" path to handle here.
     world_insert(&world, coord, block);
+
+    // Required, not optional: the server caps how many blocks it will
+    // send before receiving an ack for previously-sent ones
+    // (m_max_simul_sends in clientiface.cpp, default 40) -- without this,
+    // it sends its first batch and then refuses to send anything more,
+    // forever, regardless of how long the client waits. This was exactly
+    // "some blocks that would load in 10 mapblocks just don't, even
+    // after 1min+": we were never acknowledging anything, so the server
+    // permanently stalled once it hit that cap. Batched via
+    // flushPendingGotBlocks() (see its own comment) rather than sent
+    // immediately here -- one-per-block is what caused the outgoing
+    // reliable window to fill under a fast burst.
+    if (pendingGotBlocksCount >= PENDING_GOTBLOCKS_CAP)
+      flushPendingGotBlocks(); // defensive early flush; shouldn't normally trigger
+    pendingGotBlocks[pendingGotBlocksCount++] = coord;
 
     // Actually triggering a re-mesh for this chunk (and its neighbors,
     // since mesh.c's greedy mesher culls faces against them) is Phase 2
@@ -458,7 +510,7 @@ int peranti_init(int argc, char *argv[]) {
 
   Vertex *vertsA, *vertsB;
   uint32_t vertexCountA, vertexCountB;
-  uint16_t *idxA, *idxB;
+  uint32_t *idxA, *idxB;
   uint32_t indexCountA, indexCountB;
   mesh_to_legacy_buffers(&meshA, &vertsA, &vertexCountA, &idxA, &indexCountA);
   mesh_to_legacy_buffers(&meshB, &vertsB, &vertexCountB, &idxB, &indexCountB);
@@ -479,19 +531,19 @@ int peranti_init(int argc, char *argv[]) {
   uint32_t vertexCount = vertexCountA + vertexCountB;
   uint32_t indexCountU32 = indexCountA + indexCountB;
   Vertex *vertices = malloc(sizeof(Vertex) * vertexCount);
-  uint16_t *indices = malloc(sizeof(uint16_t) * indexCountU32);
+  uint32_t *indices = malloc(sizeof(uint32_t) * indexCountU32);
   if (!vertices || !indices) {
     fprintf(stderr, "peranti_init: out of memory combining test mapblocks\n");
     exit(1);
   }
   memcpy(vertices, vertsA, sizeof(Vertex) * vertexCountA);
   memcpy(vertices + vertexCountA, vertsB, sizeof(Vertex) * vertexCountB);
-  memcpy(indices, idxA, sizeof(uint16_t) * indexCountA);
+  memcpy(indices, idxA, sizeof(uint32_t) * indexCountA);
   // Block B's indices point into vertsB, which is now appended after
   // vertsA in the combined array -- every one needs to shift by
   // vertexCountA to still point at the right (now-relocated) vertex.
   for (uint32_t i = 0; i < indexCountB; i++) {
-    indices[indexCountA + i] = (uint16_t)(idxB[i] + vertexCountA);
+    indices[indexCountA + i] = idxB[i] + vertexCountA;
   }
 
   free(vertsA);
@@ -523,7 +575,7 @@ int peranti_init(int argc, char *argv[]) {
   };
 
   VkDeviceSize vBufSize = {sizeof(Vertex) * vertexCount};
-  VkDeviceSize iBufSize = {sizeof(uint16_t) * indexCountU32};
+  VkDeviceSize iBufSize = {sizeof(uint32_t) * indexCountU32};
   VkBufferCreateInfo bufferCI = {.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
                                  .size = vBufSize + iBufSize,
                                  .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
@@ -986,6 +1038,10 @@ int peranti_init(int argc, char *argv[]) {
   app.vBuffer = vBuffer;
   app.vBufSize = vBufSize;
   app.indexCount = indexCount;
+  // world_render_rebuild() needs this to destroy this initial (test-cube)
+  // buffer's allocation before replacing it with the first real one built
+  // from streamed chunks -- see the field's comment in app.h.
+  app.vBufferAllocation = vBufferAllocation;
   app.descriptorSetTex = descriptorSetTex;
   app.pipelineLayout = pipelineLayout;
   app.pipeline = pipeline;

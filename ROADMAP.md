@@ -261,3 +261,6 @@ handling in Phase 1 (world representation) or later grafted phases.
 3. Whether Phase 7 raytracing targets desktop-only (hardware RT viable) or
    must also run on the same GLCORE-class fallback hardware your sokol
    track cared about (raymarch-only, no hardware RT path at all).
+
+## Current stuff soon
+media/texture pipeline + node/item def parsing → incremental remeshing (fixes your lag) → basic local collision using TOCLIENT_MOVEMENT's parameters → other-player rendering → block breaking → item dropping → formspec/inventory UI, with multithreading revisited only if the incremental fix still leaves something worth parallelizing.
