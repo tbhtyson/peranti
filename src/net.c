@@ -66,6 +66,11 @@ struct Net {
      * in net.h for why this matters for MapBlock decoding specifically. */
     uint8_t serverSerVer;
 
+    /* From TOCLIENT_HELLO -- server's negotiated protocol version. Needed
+     * by content.c (zstd vs zlib branch on defs/media, >=48) and by
+     * media_sync.c once it exists. */
+    uint16_t serverProtoVer;
+
     NetGameplayHandler handler;
     void *handler_user_data;
 };
@@ -185,6 +190,7 @@ float net_get_recommended_send_interval(const Net *net) { return net->recommende
  * (e.g. assuming the disk format's leading-byte convention instead) eats
  * one real byte of the zstd stream and corrupts everything after it. */
 uint8_t net_get_server_ser_ver(const Net *net) { return net->serverSerVer; }
+uint16_t net_get_proto_ver(const Net *net) { return net->serverProtoVer; }
 
 static void net_handle_control_event(Net *net, NetControlEvent ev) {
     if (ev.type == NET_CTRL_EVENT_DISCO) {
@@ -217,6 +223,7 @@ static void net_handle_hello(Net *net, NetReader *r) {
      * Getting this confused with the disk format's leading version byte
      * would eat one real byte of the zstd stream and corrupt every block. */
     net->serverSerVer = deployed_ser_ver;
+    net->serverProtoVer = deployed_proto_ver;
 
     if (deployed_proto_ver < NET_CLIENT_PROTOCOL_VERSION_MIN) {
         fprintf(stderr, "net: server protocol version %u is below our minimum %u\n",
@@ -419,4 +426,10 @@ void net_send_gameplay(Net *net, uint16_t opcode, const uint8_t *payload, size_t
         exit(1);
     }
     net_send_opcode(net, channel_num, reliable, opcode, payload, len);
+}
+
+size_t net_get_free_outgoing_slots(const Net *net, uint8_t channel_num) {
+    if (channel_num >= NET_CHANNEL_COUNT)
+        return 0;
+    return net_channel_count_free_outgoing(&net->channels[channel_num]);
 }

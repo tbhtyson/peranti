@@ -38,6 +38,20 @@
 #define NET_MAX_INCOMING_REORDER   NET_MAX_RELIABLE_WINDOW_SIZE_SEND
 #define NET_MAX_SPLIT_ASSEMBLIES   4u
 
+/* Mirrors upstream's IncomingSplitBuffer::removeUnreliableTimedOuts, called
+ * with CONNECTION_TIMEOUT (constants.h, 30s) as the timeout. Reliable split
+ * chunks are never evicted by this -- they ride the RELIABLE layer's own
+ * ACK/resend, so a lost chunk is retried until it arrives rather than lost
+ * outright. Unreliable ones (e.g. SendActiveObjectMessages(reliable=false),
+ * sent on channel 1 for routine per-tick object updates) have no such
+ * retry: a single dropped UDP datagram leaves that assembly permanently
+ * incomplete, silently occupying one of the NET_MAX_SPLIT_ASSEMBLIES slots
+ * forever. This was the real bug behind "split assembly table full": not
+ * too few slots, but slots that could never be freed once a chunk was
+ * lost -- ordinary packet loss during normal play eventually exhausts any
+ * fixed number of them. */
+#define NET_SPLIT_UNRELIABLE_TIMEOUT 30.0f
+
 /* Split messages are sized by whatever the sender declares (chunk_count is
  * a u16, so up to 65535 chunks in principle) -- a fixed NET_MAX_SPLIT_CHUNKS
  * array sized by guesswork just breaks on the next packet type that's
@@ -79,6 +93,11 @@ typedef struct {
     uint16_t chunk_count;
     uint32_t chunks_received;
 
+    /* Whether this assembly arrived under a RELIABLE wrapper. Only
+     * unreliable assemblies are aged out by NET_SPLIT_UNRELIABLE_TIMEOUT --
+     * see that define's comment for why reliable ones are exempt. */
+    bool     reliable;
+
     /* Heap-allocated, sized exactly to this message: chunk_present/chunk_len
      * have chunk_count entries; scratch is chunk_count * NET_MAX_DATAGRAM_SIZE
      * bytes (an upper bound -- only the last chunk may be shorter than that,
@@ -91,6 +110,11 @@ typedef struct {
     size_t  *chunk_len;
     uint8_t *scratch;
 
+    /* Seconds since this assembly was created (NOT reset by each new
+     * chunk arriving -- matches upstream's IncomingSplitPacket, which
+     * ages the same way). Advanced in net_channel_tick(); an unreliable
+     * assembly whose age reaches NET_SPLIT_UNRELIABLE_TIMEOUT is freed
+     * there rather than left to leak the slot forever. */
     float    age;
 } NetSplitAssembly;
 
@@ -167,6 +191,16 @@ void net_channel_send_unreliable(NetChannel *ch, NetSocket *sock, uint16_t peer_
  * silently into dropped packets. */
 void net_channel_send_reliable(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
                                 uint8_t channel_num, const void *payload, size_t len);
+
+/* Number of outgoing-reliable slots on this channel not currently
+ * waiting for an ACK (0..NET_MAX_UNACKED_OUTGOING). For a caller that
+ * needs to send more reliable messages than the window holds -- e.g.
+ * media_sync.c, requesting hundreds of files across many
+ * TOSERVER_REQUEST_MEDIA packets since this project's outgoing packets
+ * are never split (see this file's scope note) -- checking this first
+ * lets it pace itself instead of hitting net_channel_send_reliable's
+ * hard-fail above. */
+size_t net_channel_count_free_outgoing(const NetChannel *ch);
 
 /* Call once per frame per channel: resends anything past its backoff
  * deadline. `dtime` in seconds. Returns false if a packet exceeded

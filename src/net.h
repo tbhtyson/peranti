@@ -64,9 +64,20 @@ float net_get_recommended_send_interval(const Net *net);
  * MapBlock decoder, not by anything in net.c itself. */
 uint8_t net_get_server_ser_ver(const Net *net);
 
+/* From TOCLIENT_HELLO -- server's negotiated protocol version. Needed by
+ * content.c to pick zstd (>=48) vs zlib for ITEMDEF/NODEDEF/
+ * ANNOUNCE_MEDIA payloads, and to decide which optional ContentFeatures/
+ * ItemDefinition tail fields a given server will actually send. */
+uint16_t net_get_proto_ver(const Net *net);
+
 /* Sends an already-serialized gameplay packet: `payload` is just the
  * opcode-specific body, this prepends the u16 opcode itself. Only valid
  * once NET_CONN_INGAME -- hard-fails otherwise, since sending gameplay
  * packets before auth completes is a caller bug. */
 void net_send_gameplay(Net *net, uint16_t opcode, const uint8_t *payload, size_t len,
                         uint8_t channel_num, bool reliable);
+
+/* Free outgoing-reliable slots on `channel_num` right now (see
+ * net_channel_count_free_outgoing's doc comment for why this exists) --
+ * 0 if channel_num is out of range. */
+size_t net_get_free_outgoing_slots(const Net *net, uint8_t channel_num);

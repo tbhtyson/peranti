@@ -178,3 +178,17 @@ static inline const uint8_t *net_get_str16(NetReader *r, uint16_t *out_len) {
 static inline size_t net_reader_remaining(const NetReader *r) {
     return r->size - r->pos;
 }
+
+/* Luanti's "long string" wire format (readLongString() upstream): u32
+ * length prefix + raw bytes, no NUL -- used where a u16 prefix would be
+ * too small (compressed NodeDef/ItemDef blobs, the ANNOUNCE_MEDIA name
+ * table). Same pointer-into-buffer convention as net_get_str16() above:
+ * caller must copy out before the underlying buffer is reused. */
+static inline const uint8_t *net_get_str32(NetReader *r, uint32_t *out_len) {
+    uint32_t len = net_get_u32(r);
+    net_read_require(r, len);
+    const uint8_t *p = r->data + r->pos;
+    r->pos += len;
+    *out_len = len;
+    return p;
+}

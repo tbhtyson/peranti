@@ -21,6 +21,11 @@ static bool net_seqnum_in_window(uint16_t seqnum, uint16_t next, uint16_t window
     return seqnum < window_end || seqnum >= window_start;
 }
 
+/* Defined below, alongside the rest of split-assembly handling; forward-
+ * declared here since net_channel_tick (which ages out stale unreliable
+ * assemblies) comes first in the file. */
+static void net_channel_free_assembly(NetSplitAssembly *asm_);
+
 void net_channel_init(NetChannel *ch) {
     memset(ch, 0, sizeof(*ch));
     ch->next_outgoing_seqnum = NET_SEQNUM_INITIAL;
@@ -80,6 +85,15 @@ void net_channel_send_unreliable(NetChannel *ch, NetSocket *sock, uint16_t peer_
     net_send_framed(sock, peer_id, channel_num, content, w.pos);
 }
 
+size_t net_channel_count_free_outgoing(const NetChannel *ch) {
+    size_t free_count = 0;
+    for (size_t i = 0; i < NET_MAX_UNACKED_OUTGOING; ++i) {
+        if (!ch->outgoing[i].in_use)
+            free_count++;
+    }
+    return free_count;
+}
+
 void net_channel_send_reliable(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
                                 uint8_t channel_num, const void *payload, size_t len) {
     NetOutgoingReliable *slot = NULL;
@@ -135,6 +149,22 @@ bool net_channel_tick(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
             slot->resend_count++;
         }
     }
+
+    for (size_t i = 0; i < NET_MAX_SPLIT_ASSEMBLIES; ++i) {
+        NetSplitAssembly *asm_ = &ch->splits[i];
+        if (!asm_->in_use || asm_->reliable)
+            continue; /* reliable ones are retried by the RELIABLE layer, not timed out here */
+
+        asm_->age += dtime;
+        if (asm_->age >= NET_SPLIT_UNRELIABLE_TIMEOUT) {
+            fprintf(stderr, "net_channel: NOTE: dropping timed-out unreliable split "
+                    "assembly (seqnum=%u, %u/%u chunks received) -- a UDP datagram was "
+                    "lost and won't be resent; this is normal on a lossy connection, not "
+                    "a bug\n", asm_->seqnum, asm_->chunks_received, asm_->chunk_count);
+            net_channel_free_assembly(asm_);
+        }
+    }
+
     return true;
 }
 
@@ -267,7 +297,7 @@ static void net_channel_free_assembly(NetSplitAssembly *asm_) {
     memset(asm_, 0, sizeof(*asm_));
 }
 
-static void net_channel_handle_split(NetChannel *ch, const uint8_t *data, size_t len) {
+static void net_channel_handle_split(NetChannel *ch, const uint8_t *data, size_t len, bool reliable) {
     if (len < NET_SPLIT_HEADER_SIZE) {
         fprintf(stderr, "net_channel: split packet shorter than its own header\n");
         exit(1);
@@ -303,6 +333,16 @@ static void net_channel_handle_split(NetChannel *ch, const uint8_t *data, size_t
     for (size_t i = 0; i < NET_MAX_SPLIT_ASSEMBLIES; ++i) {
         if (ch->splits[i].in_use && ch->splits[i].seqnum == seqnum) {
             asm_ = &ch->splits[i];
+            if (asm_->reliable != reliable) {
+                /* Not fatal -- just means this seqnum was reused across a
+                 * reliable and an unreliable split message, which would
+                 * be a sender bug but isn't something we can't recover
+                 * from (matches upstream's IncomingSplitBuffer::insert,
+                 * which logs and continues on the same mismatch). */
+                fprintf(stderr, "net_channel: split seqnum %u reliable=%d != "
+                        "in-progress assembly's reliable=%d\n",
+                        seqnum, (int)reliable, (int)asm_->reliable);
+            }
             break;
         }
     }
@@ -314,6 +354,8 @@ static void net_channel_handle_split(NetChannel *ch, const uint8_t *data, size_t
                 asm_->in_use = true;
                 asm_->seqnum = seqnum;
                 asm_->chunk_count = chunk_count;
+                asm_->reliable = reliable;
+                asm_->age = 0.0f;
                 asm_->chunk_present = calloc(chunk_count, sizeof(bool));
                 asm_->chunk_len = calloc(chunk_count, sizeof(size_t));
                 asm_->scratch = malloc(scratch_needed);
@@ -370,8 +412,14 @@ static void net_channel_handle_split(NetChannel *ch, const uint8_t *data, size_t
  * RELIABLE header): hands it to the ready queue (ORIGINAL), feeds the
  * split reassembler (SPLIT), or routes it to control-event handling
  * (CONTROL -- upstream does allow a bare empty-payload bootstrap packet's
- * RELIABLE wrapper to carry a nested CONTROL/SET_PEER_ID reply). */
-static void net_channel_deliver_inner(NetChannel *ch, const uint8_t *data, size_t len) {
+ * RELIABLE wrapper to carry a nested CONTROL/SET_PEER_ID reply).
+ *
+ * `reliable` records whether THIS delivery happened under a RELIABLE
+ * wrapper (directly, or via the reorder buffer draining one that was) --
+ * passed through to net_channel_handle_split so it knows whether a SPLIT
+ * chunk can rely on the RELIABLE layer's own resend, or needs its own
+ * timeout (see NET_SPLIT_UNRELIABLE_TIMEOUT). */
+static void net_channel_deliver_inner(NetChannel *ch, const uint8_t *data, size_t len, bool reliable) {
     if (len < 1) {
         fprintf(stderr, "net_channel: zero-length inner packet\n");
         exit(1);
@@ -380,7 +428,7 @@ static void net_channel_deliver_inner(NetChannel *ch, const uint8_t *data, size_
     if (type == NET_PACKET_TYPE_ORIGINAL) {
         net_channel_push_ready_copy(ch, data + NET_ORIGINAL_HEADER_SIZE, len - NET_ORIGINAL_HEADER_SIZE);
     } else if (type == NET_PACKET_TYPE_SPLIT) {
-        net_channel_handle_split(ch, data, len);
+        net_channel_handle_split(ch, data, len, reliable);
     } else if (type == NET_PACKET_TYPE_CONTROL) {
         net_channel_handle_control(ch, data, len);
     } else {
@@ -415,7 +463,7 @@ void net_channel_on_datagram(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
         net_send_ack(sock, peer_id, channel_num, seqnum);
 
         if (seqnum == ch->next_incoming_seqnum) {
-            net_channel_deliver_inner(ch, inner, inner_len);
+            net_channel_deliver_inner(ch, inner, inner_len, true);
             ch->next_incoming_seqnum = (uint16_t)((ch->next_incoming_seqnum + 1) % (NET_SEQNUM_MAX + 1));
 
             /* drain anything already buffered that is now next-in-line */
@@ -424,7 +472,7 @@ void net_channel_on_datagram(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
                 advanced = false;
                 for (size_t i = 0; i < NET_MAX_INCOMING_REORDER; ++i) {
                     if (ch->incoming[i].in_use && ch->incoming[i].seqnum == ch->next_incoming_seqnum) {
-                        net_channel_deliver_inner(ch, ch->incoming[i].data, ch->incoming[i].len);
+                        net_channel_deliver_inner(ch, ch->incoming[i].data, ch->incoming[i].len, true);
                         ch->incoming[i].in_use = false;
                         ch->next_incoming_seqnum = (uint16_t)((ch->next_incoming_seqnum + 1) % (NET_SEQNUM_MAX + 1));
                         advanced = true;
@@ -466,6 +514,6 @@ void net_channel_on_datagram(NetChannel *ch, NetSocket *sock, uint16_t peer_id,
     }
 
     /* ORIGINAL or SPLIT arriving with no RELIABLE wrapper at all (upstream
-     * allows this, e.g. TOSERVER_INIT). */
-    net_channel_deliver_inner(ch, data, len);
+     * allows this, e.g. TOSERVER_INIT). Not reliable by definition. */
+    net_channel_deliver_inner(ch, data, len, false);
 }
